@@ -1,106 +1,272 @@
-import { BORDER_RADIUS, COLORS, FONT_SIZES, SHADOWS, SPACING } from "@/constants/theme"
-import { Ionicons } from "@expo/vector-icons"
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { ErrorState } from "@/components/maps/ErrorState"
+import { LoadingMap } from "@/components/maps/LoadingMap"
+import { TelefericoCard } from "@/components/telefericos/TelefericoCard"
+import { TelefericoHeader } from "@/components/telefericos/TelefericoHeader"
+import { TelefericoMap } from "@/components/telefericos/TelefericoMap"
+import { Button } from "@/components/ui/Button"
+import { BORDER_RADIUS, COLORS, FONT_SIZES, SPACING } from "@/constants/theme"
+import { useTelefericos } from "@/hooks/useTransport"
+import { List, Map, RefreshCw } from "lucide-react-native"
+import React, { useState } from "react"
+import {
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"
 
-const TELEFERICO_LINES = [
-  { id: "1", name: "Línea Roja", stations: 4, status: "Operando", color: "#E53935" },
-  { id: "2", name: "Línea Amarilla", stations: 3, status: "Operando", color: "#FDD835" },
-  { id: "3", name: "Línea Verde", stations: 5, status: "Operando", color: "#43A047" },
-  { id: "4", name: "Línea Azul", stations: 4, status: "Operando", color: "#1E88E5" },
-  { id: "5", name: "Línea Naranja", stations: 3, status: "Operando", color: "#FB8C00" },
-  { id: "6", name: "Línea Blanca", stations: 5, status: "Operando", color: "#78909C" },
-]
+type ViewMode = "list" | "map"
 
 export function TelefericosScreen() {
-  return (
-    <View style={styles.container}>
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Text style={styles.title}>Teleféricos</Text>
-        <Text style={styles.subtitle}>Mi Teleférico - La Paz</Text>
-      </SafeAreaView>
+  const { telefericos, loading, error, refetch } = useTelefericos()
+  const [viewMode, setViewMode] = useState<ViewMode>("list")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <StatusBanner />
-        <TelefericoLines lines={TELEFERICO_LINES} />
-      </ScrollView>
-    </View>
-  )
-}
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await refetch()
+    setRefreshing(false)
+  }
 
-function StatusBanner() {
-  return (
-    <View style={styles.statusBanner}>
-      <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-      <Text style={styles.statusText}>Todas las líneas operando normalmente</Text>
-    </View>
-  )
-}
+  if (error) {
+    return <ErrorState message={error} onRetry={refetch} />
+  }
 
-function TelefericoLines({ lines }: { lines: typeof TELEFERICO_LINES }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Líneas disponibles</Text>
-      {lines.map((line) => (
-        <TouchableOpacity key={line.id} style={styles.lineCard}>
-          <View style={[styles.lineIndicator, { backgroundColor: line.color }]} />
-          <View style={styles.lineInfo}>
-            <Text style={styles.lineName}>{line.name}</Text>
-            <View style={styles.lineMeta}>
-              <Ionicons name="location-outline" size={14} color={COLORS.textSecondary} />
-              <Text style={styles.lineMetaText}>{line.stations} estaciones</Text>
-              <View style={styles.dot} />
-              <View style={styles.statusBadge}>
-                <View style={styles.statusDot} />
-                <Text style={styles.statusBadgeText}>{line.status}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <TelefericoHeader 
+          totalLines={telefericos.length} 
+          operatingLines={telefericos.length} 
+        />
+
+        {/* Toggle Vista */}
+        <View style={styles.toggleContainer}>
+          <Button
+            title="Lista"
+            onPress={() => setViewMode("list")}
+            variant={viewMode === "list" ? "primary" : "outline"}
+            size="sm"
+            icon={<List size={16} color={viewMode === "list" ? "#ffffff" : "#ef4444"} />}
+            style={styles.toggleButton}
+          />
+          
+          <Button
+            title="Mapa"
+            onPress={() => setViewMode("map")}
+            variant={viewMode === "map" ? "primary" : "outline"}
+            size="sm"
+            icon={<Map size={16} color={viewMode === "map" ? "#ffffff" : "#ef4444"} />}
+            style={styles.toggleButton}
+          />
+        </View>
+
+        {/* Contenido */}
+        {loading ? (
+          <LoadingMap />
+        ) : viewMode === "list" ? (
+          <ScrollView
+            style={styles.listContainer}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[COLORS.error]}
+                tintColor={COLORS.error}
+              />
+            }
+          >
+            <View style={styles.listHeader}>
+              <Text style={styles.resultText}>
+                {telefericos.length} líneas disponibles
+              </Text>
+              <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
+                <RefreshCw size={16} color={COLORS.gray100} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.cardsContainer}>
+              {telefericos.map((teleferico) => (
+                <TelefericoCard
+                  key={teleferico.id}
+                  teleferico={teleferico}
+                  selected={selectedId === teleferico.id}
+                  onSelect={() => setSelectedId(teleferico.id === selectedId ? null : teleferico.id)}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        ) : (
+          <View style={styles.mapContainer}>
+            <TelefericoMap 
+              telefericos={telefericos} 
+              selectedId={selectedId} 
+              onSelect={setSelectedId} 
+            />
+
+            {/* Leyenda de líneas */}
+            <View style={styles.legendContainer}>
+              <Text style={styles.legendTitle}>Líneas</Text>
+              <View style={styles.legendItems}>
+                {telefericos.map((t) => (
+                  <TouchableOpacity
+                    key={t.id}
+                    onPress={() => setSelectedId(t.id === selectedId ? null : t.id)}
+                    style={[
+                      styles.legendItem,
+                      selectedId === t.id && styles.legendItemSelected
+                    ]}
+                  >
+                    <View 
+                      style={[
+                        styles.legendDot, 
+                        { backgroundColor: t.color }
+                      ]} 
+                    />
+                    <Text style={styles.legendText}>{t.nombre}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
+
+            {/* Card flotante */}
+            {selectedId && (
+              <View style={styles.floatingCardContainer}>
+                {telefericos
+                  .filter((t) => t.id === selectedId)
+                  .map((teleferico) => (
+                    <TelefericoCard
+                      key={teleferico.id}
+                      teleferico={teleferico}
+                      selected={true}
+                      onSelect={() => setSelectedId(null)}
+                    />
+                  ))}
+              </View>
+            )}
           </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-        </TouchableOpacity>
-      ))}
-    </View>
+        )}
+      </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { backgroundColor: COLORS.white, paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg, ...SHADOWS.sm },
-  title: { fontSize: FONT_SIZES.xxl, fontWeight: "700", color: COLORS.text },
-  subtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
-  content: { flex: 1 },
-  scrollContent: { padding: SPACING.lg },
-  statusBanner: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.gray100,
+  },
+  toggleContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.success + "15",
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
     gap: SPACING.sm,
   },
-  statusText: { fontSize: FONT_SIZES.sm, color: COLORS.success, fontWeight: "500" },
-  section: { marginTop: SPACING.xl },
-  sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: "600", color: COLORS.text, marginBottom: SPACING.md },
-  lineCard: {
+  toggleButton: {
+    flex: 1,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  listHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  resultText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.gray100,
+  },
+  refreshButton: {
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  cardsContainer: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xl,
+  },
+  mapContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  legendContainer: {
+    position: "absolute",
+    bottom: 140, // Ajusta según la altura de la card flotante
+    left: SPACING.lg,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
-    marginBottom: SPACING.sm,
-    ...SHADOWS.sm,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        backdropFilter: "blur(10px)",
+      },
+      android: {
+        elevation: 8,
+        backgroundColor: "rgba(255, 255, 255, 0.98)",
+      },
+    }),
   },
-  lineIndicator: { width: 8, height: 50, borderRadius: 4 },
-  lineInfo: { flex: 1, marginLeft: SPACING.md },
-  lineName: { fontSize: FONT_SIZES.md, fontWeight: "600", color: COLORS.text },
-  lineMeta: { flexDirection: "row", alignItems: "center", marginTop: SPACING.xs, gap: SPACING.xs },
-  lineMetaText: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
-  dot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: COLORS.textLight },
-  statusBadge: { flexDirection: "row", alignItems: "center", gap: 4 },
-  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.success },
-  statusBadgeText: { fontSize: FONT_SIZES.xs, color: COLORS.success, fontWeight: "500" },
+  legendTitle: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: "600",
+    color: COLORS.gray100,
+    marginBottom: SPACING.sm,
+  },
+  legendItems: {
+    gap: SPACING.xs,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    padding: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  legendItemSelected: {
+    backgroundColor: COLORS.gray100,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.gray100,
+  },
+  floatingCardContainer: {
+    position: "absolute",
+    bottom: SPACING.lg,
+    left: SPACING.lg,
+    right: SPACING.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
 })

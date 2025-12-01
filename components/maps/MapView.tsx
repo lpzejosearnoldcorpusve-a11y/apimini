@@ -1,5 +1,6 @@
 import { Coordenada, Estacion } from '@/types/transport';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { Bus, ChevronRight, MapPin, Navigation, X, Zap } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -23,7 +24,7 @@ import MapViewBase, {
 // Centro de La Paz, Bolivia
 const LA_PAZ_CENTER = { lat: -16.5, lng: -68.15 };
 
-interface RouteType {
+export interface RouteType {
   id: string;
   coordinates: Coordenada[];
   color: string;
@@ -53,6 +54,7 @@ interface MapViewProps {
   zoom?: number;
   height?: number;
   showControls?: boolean;
+  trackUserLocation?: boolean; // habilita ubicación en tiempo real
 }
 
 export function MapViewComponent({
@@ -64,6 +66,7 @@ export function MapViewComponent({
   zoom = 13,
   height = Dimensions.get('window').height * 0.7,
   showControls = true,
+  trackUserLocation = true,
 }: MapViewProps) {
   const mapRef = useRef<MapViewBase>(null);
   const [selectedMarker, setSelectedMarker] = useState<any>(null);
@@ -75,6 +78,41 @@ export function MapViewComponent({
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
+  const [userLocation, setUserLocation] = useState<Coordenada | null>(null);
+  const locationWatchRef = useRef<Location.LocationSubscription | null>(null);
+
+  // Obtener y vigilar ubicación en tiempo real
+  useEffect(() => {
+    if (!trackUserLocation) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('Permiso de ubicación denegado');
+          return;
+        }
+        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        if (!cancelled) {
+          setUserLocation({ lat: current.coords.latitude, lng: current.coords.longitude });
+        }
+        locationWatchRef.current = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 10 },
+          (loc) => {
+            if (!cancelled) {
+              setUserLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+            }
+          }
+        );
+      } catch (e) {
+        console.warn('Error obteniendo ubicación', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      locationWatchRef.current?.remove();
+    };
+  }, [trackUserLocation]);
 
   // Ajustar vista cuando se selecciona una ruta
   useEffect(() => {
@@ -109,15 +147,32 @@ export function MapViewComponent({
     }, 1000);
   };
 
-  // Navegar a ubicación actual (simulado)
+  // Navegar a ubicación actual (real si disponible)
   const goToCurrentLocation = () => {
-    // En producción usarías Geolocation aquí
-    const mockLocation = { latitude: -16.495, longitude: -68.133 };
-    mapRef.current?.animateToRegion({
-      ...mockLocation,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 1000);
+    if (userLocation) {
+      mapRef.current?.animateToRegion({
+        latitude: userLocation.lat,
+        longitude: userLocation.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1000);
+    } else {
+      // Si aún no disponible, intentar obtener una vez
+      (async () => {
+        try {
+          const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          setUserLocation({ lat: current.coords.latitude, lng: current.coords.longitude });
+          mapRef.current?.animateToRegion({
+            latitude: current.coords.latitude,
+            longitude: current.coords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 1000);
+        } catch (e) {
+          console.warn('No se pudo obtener ubicación actual', e);
+        }
+      })();
+    }
   };
 
   // Renderizar icono personalizado
@@ -169,7 +224,7 @@ export function MapViewComponent({
           setIsMapReady(true);
           setMapError(false);
         }}
-        showsUserLocation={true}
+        showsUserLocation={!!trackUserLocation}
         showsMyLocationButton={false}
         showsCompass={true}
         showsScale={true}
@@ -374,6 +429,27 @@ export function MapViewComponent({
             </View>
           </Marker>
         ))}
+
+        {/* Ubicación del usuario */}
+        {trackUserLocation && userLocation && (
+          <>
+            <Marker
+              coordinate={{ latitude: userLocation.lat, longitude: userLocation.lng }}
+              title="Tu ubicación"
+            >
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#2563eb', justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#ffffff' }} />
+              </View>
+            </Marker>
+            <Circle
+              center={{ latitude: userLocation.lat, longitude: userLocation.lng }}
+              radius={50}
+              fillColor="rgba(37,99,235,0.15)"
+              strokeColor="rgba(37,99,235,0.6)"
+              strokeWidth={2}
+            />
+          </>
+        )}
 
         {/* Efecto de círculo en centro del mapa */}
         <Circle

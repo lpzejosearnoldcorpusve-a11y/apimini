@@ -7,7 +7,7 @@ import { BORDER_RADIUS, COLORS, FONT_SIZES, SHADOWS, SPACING } from "@/constants
 import { Ionicons } from "@expo/vector-icons"
 import React, { Dispatch, SetStateAction } from "react"
 
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native"
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native"
 
 // NOTE: `labels` and `CITIES` are provided via props from the parent screen.
 
@@ -70,6 +70,7 @@ export function SignupSteps({
 
   return (
     <View style={styles.card}>
+      <Image source={require('../../assets/logo.png')} style={styles.logo} />
       <StepIndicator currentStep={currentStep} totalSteps={totalSteps} labels={labels} />
 
       {apiError ? (
@@ -306,6 +307,13 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xl,
     padding: SPACING.xl,
     ...SHADOWS.lg,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    alignSelf: 'center',
+    marginBottom: SPACING.lg,
+    resizeMode: 'contain',
   },
   errorBanner: {
     flexDirection: "row",

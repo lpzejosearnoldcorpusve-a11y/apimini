@@ -9,7 +9,7 @@ import { useHaptics } from "@/hooks/useHaptics"
 import { Ionicons } from "@expo/vector-icons"
 import { router } from "expo-router"
 import { useState } from "react"
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native"
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native"
 
 export function LoginForm() {
   const { login, isLoading } = useAuth()
@@ -42,6 +42,7 @@ export function LoginForm() {
 
   return (
     <View style={styles.card}>
+      <Image source={require('../../assets/logo.png')} style={styles.logo} />
       <Text style={styles.welcomeText}>Bienvenido de vuelta</Text>
       <Text style={styles.instructionText}>Ingresa tus credenciales para continuar</Text>
 
@@ -100,6 +101,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
+  },
+  logo: {
+    width: 96,
+    height: 96,
+    alignSelf: 'center',
+    marginBottom: SPACING.lg,
+    resizeMode: 'contain',
   },
   welcomeText: {
     fontSize: FONT_SIZES.xl,

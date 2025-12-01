@@ -12,7 +12,7 @@ export const COLORS = {
   success: "#28A745",
   warning: "#FFC107",
   error: "#DC3545",
-
+  gray100: "#e9ecef",
   // Neutros
   white: "#FFFFFF",
   background: "#F5F9FA",

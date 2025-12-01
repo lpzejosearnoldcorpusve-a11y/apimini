@@ -1,129 +1,212 @@
-import { BORDER_RADIUS, COLORS, FONT_SIZES, SHADOWS, SPACING } from "@/constants/theme"
-import { Ionicons } from "@expo/vector-icons"
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
+import { ErrorState } from "@/components/maps/ErrorState"
+import { LoadingMap } from "@/components/maps/LoadingMap"
+import { MinibusCard } from "@/components/minibuses/MinibusCard"
+import { MinibusHeader } from "@/components/minibuses/MinibusHeader"
+import { MinibusMap } from "@/components/minibuses/MinibusMap"
+import { Button } from "@/components/ui/Button"
+import { BORDER_RADIUS, COLORS, FONT_SIZES, SPACING } from "@/constants/theme"
+import { useMinibuses } from "@/hooks/useTransport"
+import { List, Map, RefreshCw } from "lucide-react-native"
+import React, { useMemo, useState } from "react"
+import {
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"
 
-const MINIBUS_LINES = [
-  { id: "1", number: "201", route: "Centro - Zona Sur", color: "#E53935" },
-  { id: "2", number: "130", route: "Sopocachi - Miraflores", color: "#1E88E5" },
-  { id: "3", number: "288", route: "El Alto - Obrajes", color: "#43A047" },
-  { id: "4", number: "312", route: "Villa Fátima - Calacoto", color: "#FB8C00" },
-]
+type ViewMode = "list" | "map"
 
 export function MinibusesScreen() {
-  return (
-    <View style={styles.container}>
-      <SafeAreaView edges={["top"]} style={styles.header}>
-        <Text style={styles.title}>Minibuses</Text>
-        <Text style={styles.subtitle}>Encuentra tu línea de transporte</Text>
-      </SafeAreaView>
+  const { minibuses, loading, error, refetch } = useMinibuses()
+  const [viewMode, setViewMode] = useState<ViewMode>("list")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [refreshing, setRefreshing] = useState(false)
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <SearchBar placeholder="Buscar línea o ruta..." />
-        <FilterChips />
-        <LinesList lines={MINIBUS_LINES} />
-      </ScrollView>
-    </View>
-  )
-}
+  // Filtrar minibuses por búsqueda
+  const filteredMinibuses = useMemo(() => {
+    if (!searchQuery) return minibuses
+    const query = searchQuery.toLowerCase()
+    return minibuses.filter(
+      (m) =>
+        m.linea.toLowerCase().includes(query) ||
+        m.sindicato.toLowerCase().includes(query) ||
+        m.rutaNombre.toLowerCase().includes(query),
+    )
+  }, [minibuses, searchQuery])
 
-function SearchBar({ placeholder }: { placeholder: string }) {
-  return (
-    <TouchableOpacity style={styles.searchBar}>
-      <Ionicons name="search" size={20} color={COLORS.textSecondary} />
-      <Text style={styles.searchPlaceholder}>{placeholder}</Text>
-    </TouchableOpacity>
-  )
-}
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await refetch()
+    setRefreshing(false)
+  }
 
-function FilterChips() {
-  return (
-    <View style={styles.filters}>
-      <TouchableOpacity style={[styles.filterChip, styles.filterChipActive]}>
-        <Text style={styles.filterChipTextActive}>Todos</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.filterChip}>
-        <Text style={styles.filterChipText}>Minibuses</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.filterChip}>
-        <Text style={styles.filterChipText}>PumaKatari</Text>
-      </TouchableOpacity>
-    </View>
-  )
-}
+  if (error) {
+    return <ErrorState message={error} onRetry={refetch} />
+  }
 
-function LinesList({ lines }: { lines: typeof MINIBUS_LINES }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Líneas frecuentes</Text>
-      {lines.map((line) => (
-        <TouchableOpacity key={line.id} style={styles.lineCard}>
-          <View style={[styles.lineNumber, { backgroundColor: line.color }]}>
-            <Text style={styles.lineNumberText}>{line.number}</Text>
-          </View>
-          <View style={styles.lineInfo}>
-            <Text style={styles.lineRoute}>{line.route}</Text>
-            <View style={styles.lineMeta}>
-              <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
-              <Text style={styles.lineMetaText}>Cada 5-10 min</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <MinibusHeader 
+          searchQuery={searchQuery} 
+          onSearchChange={setSearchQuery} 
+          totalLines={minibuses.length} 
+        />
+
+        {/* Toggle Vista */}
+        <View style={styles.toggleContainer}>
+          <Button
+            title="Lista"
+            onPress={() => setViewMode("list")}
+            variant={viewMode === "list" ? "primary" : "outline"}
+            size="sm"
+            icon={<List size={16} />}
+            style={styles.toggleButton}
+          />
+          
+          <Button
+            title="Mapa"
+            onPress={() => setViewMode("map")}
+            variant={viewMode === "map" ? "primary" : "outline"}
+            size="sm"
+            icon={<Map size={16} />}
+            style={styles.toggleButton}
+          />
+        </View>
+
+        {/* Contenido */}
+        {loading ? (
+          <LoadingMap />
+        ) : viewMode === "list" ? (
+          <ScrollView
+            style={styles.listContainer}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[COLORS.primary]}
+                tintColor={COLORS.primary}
+              />
+            }
+          >
+            <View style={styles.listHeader}>
+              <Text style={styles.resultText}>
+                {filteredMinibuses.length} resultado{filteredMinibuses.length !== 1 ? "s" : ""}
+              </Text>
+              <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
+                <RefreshCw size={16} color={COLORS.gray100} />
+              </TouchableOpacity>
             </View>
+            
+            <View style={styles.cardsContainer}>
+              {filteredMinibuses.map((minibus) => (
+                <MinibusCard
+                  key={minibus.id}
+                  minibus={minibus}
+                  selected={selectedId === minibus.id}
+                  onSelect={() => setSelectedId(minibus.id === selectedId ? null : minibus.id)}
+                />
+              ))}
+            </View>
+          </ScrollView>
+        ) : (
+          <View style={styles.mapContainer}>
+            <MinibusMap 
+              minibuses={filteredMinibuses} 
+              selectedId={selectedId} 
+              onSelect={setSelectedId} 
+            />
+
+            {/* Lista flotante de rutas seleccionadas */}
+            {selectedId && (
+              <View style={styles.floatingCardContainer}>
+                {filteredMinibuses
+                  .filter((m) => m.id === selectedId)
+                  .map((minibus) => (
+                    <MinibusCard
+                      key={minibus.id}
+                      minibus={minibus}
+                      selected={true}
+                      onSelect={() => setSelectedId(null)}
+                    />
+                  ))}
+              </View>
+            )}
           </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-        </TouchableOpacity>
-      ))}
-    </View>
+        )}
+      </View>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  header: { backgroundColor: COLORS.white, paddingHorizontal: SPACING.lg, paddingBottom: SPACING.lg, ...SHADOWS.sm },
-  title: { fontSize: FONT_SIZES.xxl, fontWeight: "700", color: COLORS.text },
-  subtitle: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
-  content: { flex: 1 },
-  scrollContent: { padding: SPACING.lg },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    gap: SPACING.sm,
-    ...SHADOWS.sm,
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
   },
-  searchPlaceholder: { color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
-  filters: { flexDirection: "row", gap: SPACING.sm, marginTop: SPACING.lg },
-  filterChip: {
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.gray100,
+  },
+  toggleContainer: {
+    flexDirection: "row",
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
     backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray100,
+    gap: SPACING.sm,
   },
-  filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  filterChipText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  filterChipTextActive: { fontSize: FONT_SIZES.sm, color: COLORS.white, fontWeight: "500" },
-  section: { marginTop: SPACING.xl },
-  sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: "600", color: COLORS.text, marginBottom: SPACING.md },
-  lineCard: {
+  toggleButton: {
+    flex: 1,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  listHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-    ...SHADOWS.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
   },
-  lineNumber: { width: 50, height: 50, borderRadius: BORDER_RADIUS.md, alignItems: "center", justifyContent: "center" },
-  lineNumberText: { fontSize: FONT_SIZES.lg, fontWeight: "700", color: COLORS.white },
-  lineInfo: { flex: 1, marginLeft: SPACING.md },
-  lineRoute: { fontSize: FONT_SIZES.md, fontWeight: "500", color: COLORS.text },
-  lineMeta: { flexDirection: "row", alignItems: "center", marginTop: SPACING.xs, gap: SPACING.xs },
-  lineMetaText: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary },
+  resultText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.gray100,
+  },
+  refreshButton: {
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  cardsContainer: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xl,
+  },
+  mapContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  floatingCardContainer: {
+    position: "absolute",
+    bottom: SPACING.lg,
+    left: SPACING.lg,
+    right: SPACING.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 8,
+      },
+    }),
+  },
 })

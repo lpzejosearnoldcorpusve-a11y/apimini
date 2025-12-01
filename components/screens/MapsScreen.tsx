@@ -8,14 +8,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Bus, Cable, ChevronDown, ChevronUp, Layers, Navigation, Search, Train } from 'lucide-react-native';
 import React, { useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Animated,
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 type ViewMode = 'all' | 'minibuses' | 'telefericos';
@@ -106,6 +106,7 @@ export function MapsScreen() {
               onRouteSelect={setSelectedId}
               height={panelExpanded ? Dimensions.get('window').height * 0.65 : Dimensions.get('window').height * 0.9}
               showControls={true}
+              trackUserLocation={true}
             />
 
             {/* Barra de búsqueda */}
