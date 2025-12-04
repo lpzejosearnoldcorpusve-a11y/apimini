@@ -41,6 +41,25 @@ export interface LoginCredentials {
   password: string
 }
 
+export interface UpdateUserData {
+  nombres: string
+  apellidoPaterno: string
+  apellidoMaterno: string
+  carnetIdentidad: string
+  ciudad: string
+  complemento: string | null
+  fechaNacimiento: string
+  celular: string
+  password?: string
+  estado: "activo" | "inactivo"
+}
+
+export interface UpdatePasswordData {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+}
+
 export interface AuthState {
   user: User | null
   token: string | null

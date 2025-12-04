@@ -1,33 +1,33 @@
 // App.tsx
+import {
+  Bell,
+  Bus,
+  Cable,
+  Calendar,
+  CheckCircle2,
+  ChevronRight,
+  CreditCard,
+  Eye,
+  EyeOff,
+  IdCard,
+  Lock,
+  MapPin,
+  Navigation,
+  Phone,
+  User,
+} from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
-  View,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  StatusBar,
-  SafeAreaView,
-  Platform,
+  View,
 } from 'react-native';
-import {
-  Bus,
-  MapPin,
-  CreditCard,
-  Bell,
-  User,
-  Navigation,
-  Cable,
-  Phone,
-  Calendar,
-  IdCard,
-  Lock,
-  Eye,
-  EyeOff,
-  ChevronRight,
-  CheckCircle2,
-} from 'lucide-react-native';
 
 const COLORS = {
   primary: '#00A99D',

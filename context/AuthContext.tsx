@@ -3,6 +3,7 @@
 import { authService } from "@/services/authService"
 import type { RegisterData, User } from "@/types/auth"
 import { router } from "expo-router"
+import * as SecureStore from "expo-secure-store"
 import type React from "react"
 import { createContext, useCallback, useContext, useEffect, useState } from "react"
 
@@ -14,6 +15,7 @@ interface AuthContextType {
   login: (carnetIdentidad: string, password: string) => Promise<{ success: boolean; error?: string }>
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -41,6 +43,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const userJson = await SecureStore.getItemAsync("turuta_user")
+      if (userJson) {
+        const updatedUser = JSON.parse(userJson)
+        setUser(updatedUser)
+      }
+    } catch (error) {
+      console.error("Error refreshing user:", error)
+    }
+  }, [])
+
   const login = useCallback(async (carnetIdentidad: string, password: string) => {
     try {
       setIsLoading(true)
@@ -66,7 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await authService.register(data)
 
         if (result.success) {
-          // Auto login después del registro
           return await login(data.carnetIdentidad, data.password)
         }
 
@@ -95,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        refreshUser, // Added to provider
       }}
     >
       {children}
