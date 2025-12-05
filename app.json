@@ -8,20 +8,16 @@
     "scheme": "miniapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    
-    // ✅ AÑADIDO: Splash screen config
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.axeluria79.miniapp",
       "buildNumber": "1"
     },
-    
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -32,12 +28,10 @@
       "package": "com.axeluria79.miniapp",
       "versionCode": 1
     },
-    
     "web": {
       "output": "static",
       "favicon": "./assets/images/android-icon-foreground.png"
     },
-    
     "plugins": [
       "expo-router",
       [
@@ -50,7 +44,6 @@
         }
       ],
       "expo-secure-store",
-      // ✅ AÑADIR este plugin para configurar deploymentTarget
       [
         "expo-build-properties",
         {
@@ -58,21 +51,19 @@
             "deploymentTarget": "15.1"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
-    
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-    
     "extra": {
       "router": {},
       "eas": {
         "projectId": "b9904e8e-6db7-4e4d-83a3-23eb266b4c95"
       }
     },
-    
     "owner": "axeluria79"
   }
 }
