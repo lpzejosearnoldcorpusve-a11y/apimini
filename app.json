@@ -8,11 +8,9 @@
     "scheme": "miniapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "ios": {
       "supportsTablet": true
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -22,12 +20,10 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.axeluria79.miniapp"
     },
-
     "web": {
       "output": "static",
       "favicon": "./assets/images/android-icon-foreground.png"
     },
-
     "plugins": [
       "expo-router",
       [
@@ -42,19 +38,22 @@
       ],
       "expo-secure-store"
     ],
-
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
-
     "extra": {
       "router": {},
       "eas": {
         "projectId": "b9904e8e-6db7-4e4d-83a3-23eb266b4c95"
       }
     },
-
-    "owner": "axeluria79"
+    "owner": "axeluria79",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b9904e8e-6db7-4e4d-83a3-23eb266b4c95"
+    }
   }
 }
