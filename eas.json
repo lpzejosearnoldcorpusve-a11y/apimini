@@ -1,13 +1,52 @@
 {
+  "cli": {
+    "appVersionSource": "remote",
+    "requireCommit": true,
+    "promptToConfigurePushNotifications": false
+  },
   "build": {
     "preview": {
+      "env": {
+        "NODE_ENV": "development"
+      },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "distribution": "internal",
+      "channel": "preview",
+      "autoIncrement": true
     },
     "production": {
+      "env": {
+        "NODE_ENV": "production"
+      },
       "android": {
         "buildType": "app-bundle"
+      },
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": false
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "channel": "development",
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account-key.json",
+        "track": "internal"
+      },
+      "ios": {
+        "appleId": "your-apple-id@email.com",
+        "ascAppId": "YOUR_APP_ID",
+        "appleTeamId": "YOUR_TEAM_ID"
       }
     }
   }
