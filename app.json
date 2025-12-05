@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Mini App",
+    "name": "mini-app",
     "slug": "mini-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,48 +9,33 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     
+    // ✅ AÑADIDO: Splash screen config
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff",
-      "dark": {
-        "image": "./assets/images/splash-icon.png",
-        "backgroundColor": "#000000",
-        "resizeMode": "contain"
-      }
+      "backgroundColor": "#ffffff"
     },
     
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.axeluria79.miniapp",
-      "buildNumber": "1",
-      "infoPlist": {
-        "UISupportsDocumentBrowser": true,
-        "UIFileSharingEnabled": true
-      }
+      "buildNumber": "1"
     },
     
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundColor": "#E6F4FE",
-        "backgroundImage": "./assets/images/android-icon-background.png"
+        "backgroundColor": "#E6F4FE"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.axeluria79.miniapp",
-      "versionCode": 1,
-      "permissions": [
-        "android.permission.INTERNET",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
-      ]
+      "versionCode": 1
     },
     
     "web": {
       "output": "static",
-      "bundler": "metro",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/android-icon-foreground.png"
     },
     
     "plugins": [
@@ -61,25 +46,16 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "image": "./assets/images/splash-icon-dark.png",
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#ffffff"
         }
       ],
       "expo-secure-store",
+      // ✅ AÑADIR este plugin para configurar deploymentTarget
       [
         "expo-build-properties",
         {
-          "android": {
-            "minSdkVersion": 23,
-            "compileSdkVersion": 34,
-            "targetSdkVersion": 34,
-            "buildToolsVersion": "34.0.0"
-          },
           "ios": {
-            "deploymentTarget": "13.0"
+            "deploymentTarget": "15.1"
           }
         }
       ]
@@ -87,29 +63,16 @@
     
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true,
-      "tsconfigPaths": true
+      "reactCompiler": true
     },
     
     "extra": {
-      "router": {
-        "origin": false
-      },
+      "router": {},
       "eas": {
         "projectId": "b9904e8e-6db7-4e4d-83a3-23eb266b4c95"
       }
     },
     
-    "owner": "axeluria79",
-    
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/b9904e8e-6db7-4e4d-83a3-23eb266b4c95",
-      "enabled": true,
-      "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_LOAD"
-    }
+    "owner": "axeluria79"
   }
 }
