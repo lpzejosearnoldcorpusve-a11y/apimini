@@ -357,8 +357,8 @@ function StepContactInfo({
       </View>
 
       <Input
-        label="Zona / Dirección"
-        placeholder="Ej: Sopocachi, Calle 5"
+        label="Complemento (opcional)"
+        placeholder="LP"
         icon="home-outline"
         value={formData.complemento}
         onChangeText={(text) => updateField("complemento", text)}

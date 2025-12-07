@@ -4,22 +4,25 @@ import * as Location from 'expo-location';
 import { Bus, ChevronRight, MapPin, Navigation, X, Zap } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  Modal,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    Modal,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+
+// Importaciones para react-native-maps
 import MapViewBase, {
-  Circle,
-  Marker,
-  Polyline,
-  PROVIDER_DEFAULT,
-  Region,
-  UrlTile
+    Circle,
+    Marker,
+    Polyline,
+    PROVIDER_DEFAULT,
+    PROVIDER_GOOGLE,
+    Region,
+    UrlTile
 } from 'react-native-maps';
 
 // Centro de La Paz, Bolivia
@@ -123,13 +126,13 @@ export function MapViewComponent({
       const selectedRoute = routes.find(r => r.id === selectedRouteId);
       if (selectedRoute && selectedRoute.coordinates.length > 0) {
         const coords = selectedRoute.coordinates;
-        
+
         // Calcular límites
         const minLat = Math.min(...coords.map(c => c.lat));
         const maxLat = Math.max(...coords.map(c => c.lat));
         const minLng = Math.min(...coords.map(c => c.lng));
         const maxLng = Math.max(...coords.map(c => c.lng));
-        
+
         mapRef.current?.animateToRegion({
           latitude: (minLat + maxLat) / 2,
           longitude: (minLng + maxLng) / 2,
@@ -219,7 +222,7 @@ export function MapViewComponent({
       {/* Mapa */}
       <MapViewBase
         ref={mapRef}
-        provider={PROVIDER_DEFAULT}
+        provider={Platform.OS === 'ios' ? PROVIDER_DEFAULT : PROVIDER_GOOGLE}
         mapType={Platform.OS === 'android' ? 'none' : 'standard'}
         style={[styles.map, (!isMapReady || mapError) && styles.hiddenMap]}
         initialRegion={region}
@@ -241,11 +244,11 @@ export function MapViewComponent({
         showsScale={true}
         showsPointsOfInterest={false}
       >
-        {/* Tiles de CartoCDN - Solo para Android (iOS usa Apple Maps nativo) */}
+        {/* Tiles de CartoCDN - Solo para Android cuando Google Maps falla */}
         {Platform.OS === 'android' && (
           <UrlTile
-            urlTemplate="https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"
-            maximumZ={19}
+            urlTemplate="https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+            maximumZ={18}
             minimumZ={1}
             flipY={false}
             tileSize={256}
@@ -263,7 +266,7 @@ export function MapViewComponent({
               strokeWidth={route.type === 'cable' ? 10 : 8}
               zIndex={1}
             />
-            
+
             {/* Línea principal */}
             <Polyline
               coordinates={route.coordinates.map(c => ({ latitude: c.lat, longitude: c.lng }))}
@@ -274,7 +277,7 @@ export function MapViewComponent({
               lineCap="round"
               lineJoin="round"
             />
-            
+
             {/* Efecto de brillo para líneas seleccionadas */}
             {selectedRouteId === route.id && (
               <Polyline
@@ -286,7 +289,7 @@ export function MapViewComponent({
                 lineJoin="round"
               />
             )}
-            
+
             {/* Marcadores de inicio y fin */}
             {route.coordinates.length > 0 && (
               <>
@@ -304,7 +307,7 @@ export function MapViewComponent({
                     </LinearGradient>
                   </View>
                 </Marker>
-                
+
                 {/* Marcador de fin */}
                 <Marker
                   coordinate={{
@@ -339,7 +342,7 @@ export function MapViewComponent({
               lineCap="round"
               zIndex={3}
             />
-            
+
             {/* Efecto de gradiente */}
             <Polyline
               coordinates={line.stations.map(s => ({ latitude: s.lat, longitude: s.lng }))}
@@ -348,7 +351,7 @@ export function MapViewComponent({
               zIndex={4}
               lineCap="round"
             />
-            
+
             {/* Estaciones */}
             {line.stations.map((station, index) => (
               <Marker
@@ -363,15 +366,15 @@ export function MapViewComponent({
                 }}
               >
                 <LinearGradient
-                  colors={index === 0 || index === line.stations.length - 1 
-                    ? [line.color, '#ffffff'] 
+                  colors={index === 0 || index === line.stations.length - 1
+                    ? [line.color, '#ffffff']
                     : ['#ffffff', line.color]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[
                     styles.stationMarker,
-                    index === 0 || index === line.stations.length - 1 
-                      ? styles.terminalStation 
+                    index === 0 || index === line.stations.length - 1
+                      ? styles.terminalStation
                       : styles.intermediateStation,
                   ]}
                 >
@@ -402,7 +405,7 @@ export function MapViewComponent({
               >
                 {renderCustomIcon(marker.icon || 'pin', marker.color || '#0891b2')}
               </LinearGradient>
-              
+
               {/* Efecto de pulso */}
               <View style={[styles.pulseEffect, { borderColor: marker.color || '#0891b2' }]} />
             </View>

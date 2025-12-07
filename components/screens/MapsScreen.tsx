@@ -1,666 +1,494 @@
-import { LoadingMap } from '@/components/maps/LoadingMap';
-import { MapLegend } from '@/components/maps/MapLegend';
-import { MapView } from '@/components/maps/MapView';
-import { RouteFinderModal } from '@/components/maps/RouteFinderModal';
-import { SearchAutocomplete } from '@/components/maps/SearchAutocomplete';
-import { NavigationModal } from '@/components/navigation/NavigationModal';
-import { Button } from '@/components/ui/Button';
-import { COLORS } from '@/constants/theme';
-import { useMinibuses, useTelefericos } from '@/hooks/useTransport';
-import { searchService } from '@/services/searchService';
-import type { NavigationDestination } from '@/types/navigation';
-import type { SearchSuggestion } from '@/types/search';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Location from 'expo-location';
-import { Bus, Cable, ChevronDown, ChevronUp, Crosshair, Layers, MapPin, Navigation, Train } from 'lucide-react-native';
-import React, { useCallback, useRef, useState } from 'react';
+import { CartoMap } from "@/components/maps/CartoMap"
+import { DestinationSheet } from "@/components/maps/DestinationSheet"
+import { MapControls } from "@/components/maps/MapControls"
+import { SearchBar } from "@/components/maps/SearchBar"
+import { NavigationMode } from "@/components/navigation/NavigationMode"
+import { RoutePreviewSheet } from "@/components/navigation/RoutePreviewSheet"
+import { useLocation } from "@/hooks/useLocation"
+import { useMinibuses, useTelefericos } from "@/hooks/useTransport"
+import { routingService } from "@/services/routingService"
+import type { Coordenada, RouteOption, SearchResult } from "@/types/routing"
+import { LinearGradient } from 'expo-linear-gradient'
+import { Clock, MapPin, Navigation, Star } from 'lucide-react-native'
+import React, { useEffect, useMemo, useState } from "react"
 import {
+  ActivityIndicator,
   Alert,
-  Animated,
   Dimensions,
-  ScrollView,
+  Platform,
+  SafeAreaView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-} from 'react-native';
+  View
+} from "react-native"
 
-type ViewMode = 'all' | 'minibuses' | 'telefericos';
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
-export function MapsScreen() {
-  const { minibuses, loading: loadingMinibuses } = useMinibuses();
-  const { telefericos, loading: loadingTelefericos } = useTelefericos();
-  const [viewMode, setViewMode] = useState<ViewMode>('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [panelExpanded, setPanelExpanded] = useState(true);
-  const panelAnimation = useRef(new Animated.Value(0)).current;
-  
-  // Estados para búsqueda y navegación
-  const [isSelectingOnMap, setIsSelectingOnMap] = useState(false);
-  const [selectedDestination, setSelectedDestination] = useState<SearchSuggestion | null>(null);
-  const [showRouteFinder, setShowRouteFinder] = useState(false);
-  const [showNavigation, setShowNavigation] = useState(false);
-  const [navigationDestination, setNavigationDestination] = useState<NavigationDestination | null>(null);
-  const [navigationColor, setNavigationColor] = useState(COLORS.primary);
-  const [navigationTransportName, setNavigationTransportName] = useState('');
-
-  const loading = loadingMinibuses || loadingTelefericos;
-
-  // Función para togglear el panel con animación
-  const togglePanel = () => {
-    const toValue = panelExpanded ? 1 : 0;
-    setPanelExpanded(!panelExpanded);
-    
-    Animated.spring(panelAnimation, {
-      toValue,
-      useNativeDriver: true,
-      tension: 65,
-      friction: 10,
-    }).start();
-  };
-
-  // Calcular la altura del panel basado en el contenido
-  const panelHeight = Dimensions.get('window').height * 0.45;
-
-  // Preparar rutas de minibuses
-  const minibusRoutes = minibuses.map((m) => ({
-    id: m.id,
-    coordinates: m.ruta,
-    color: '#0891b2',
-    name: `Línea ${m.linea} - ${m.sindicato}`,
-    type: 'minibus' as const,
-  }));
-
-  // Preparar líneas de teleférico
-  const telefericoStations = telefericos.map((t) => ({
-    lineId: t.id,
-    stations: t.estaciones,
-    color: t.color,
-    lineName: t.nombre,
-  }));
-
-  const showMinibuses = viewMode === 'all' || viewMode === 'minibuses';
-  const showTelefericos = viewMode === 'all' || viewMode === 'telefericos';
-
-  // Items para la leyenda
-  const legendItems = [
-    ...(showMinibuses ? [{
-      color: '#0891b2',
-      label: 'Rutas Minibus',
-      type: 'line' as const,
-    }] : []),
-    ...(showTelefericos ? telefericos.slice(0, 3).map(t => ({
-      color: t.color,
-      label: t.nombre,
-      type: 'dashed' as const,
-    })) : []),
-  ];
-
-  // Manejar selección desde autocompletado
-  const handleSelectSuggestion = useCallback((suggestion: SearchSuggestion) => {
-    console.log('🔍 Sugerencia seleccionada:', suggestion);
-    setSelectedDestination(suggestion);
-    
-    // Si es una parada o estación directa, navegar inmediatamente
-    if (suggestion.type === 'stop' || suggestion.type === 'station') {
-      const dest: NavigationDestination = {
-        name: suggestion.name,
-        lat: suggestion.lat,
-        lng: suggestion.lng,
-        type: suggestion.type === 'station' ? 'estacion' : 'parada',
-      };
-      
-      // Encontrar el color del transporte
-      if (suggestion.transportType === 'teleferico' && suggestion.transportId) {
-        const teleferico = telefericos.find(t => t.id === suggestion.transportId);
-        setNavigationColor(teleferico?.color || COLORS.primary);
-        setNavigationTransportName(teleferico?.nombre || '');
-      } else {
-        setNavigationColor(COLORS.primary);
-        if (suggestion.transportId) {
-          const minibus = minibuses.find(m => m.id === suggestion.transportId);
-          setNavigationTransportName(minibus ? `Línea ${minibus.linea}` : '');
-        }
-      }
-      
-      setNavigationDestination(dest);
-      setShowNavigation(true);
-    } else {
-      // Si es una zona o calle, mostrar rutas cercanas
-      setShowRouteFinder(true);
-    }
-  }, [telefericos, minibuses]);
-
-  // Manejar selección de punto en mapa
-  const handleSelectPoint = useCallback(async (lat: number, lng: number, action: string) => {
-    if (action === 'current_location') {
-      // Obtener ubicación actual
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permiso denegado', 'Necesitamos acceso a tu ubicación');
-          return;
-        }
-        
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        
-        const address = await searchService.reverseGeocode(
-          location.coords.latitude,
-          location.coords.longitude
-        );
-        
-        setSelectedDestination({
-          id: 'current-location',
-          name: 'Mi ubicación actual',
-          description: address,
-          type: 'custom',
-          lat: location.coords.latitude,
-          lng: location.coords.longitude,
-        });
-        setShowRouteFinder(true);
-      } catch (error) {
-        console.error('Error obteniendo ubicación:', error);
-        Alert.alert('Error', 'No se pudo obtener tu ubicación');
-      }
-    } else if (action === 'select_on_map') {
-      // Activar modo de selección en mapa
-      setIsSelectingOnMap(true);
-      setPanelExpanded(false);
-      panelAnimation.setValue(1);
-      Alert.alert(
-        'Selecciona un punto',
-        'Mantén presionado en el mapa para seleccionar un destino',
-        [{ text: 'Entendido' }]
-      );
-    }
-  }, [panelAnimation]);
-
-  // Manejar selección de punto desde el mapa
-  const handleMapLongPress = useCallback(async (lat: number, lng: number) => {
-    if (!isSelectingOnMap) return;
-    
-    setIsSelectingOnMap(false);
-    
-    const address = await searchService.reverseGeocode(lat, lng);
-    
-    setSelectedDestination({
-      id: `map-point-${Date.now()}`,
-      name: address,
-      description: 'Punto seleccionado en el mapa',
-      type: 'custom',
-      lat,
-      lng,
-    });
-    setShowRouteFinder(true);
-  }, [isSelectingOnMap]);
-
-  // Manejar navegación desde RouteFinderModal
-  const handleNavigateToStop = useCallback((
-    destination: NavigationDestination,
-    transportType: 'minibus' | 'teleferico',
-    transportId: string
-  ) => {
-    if (transportType === 'teleferico') {
-      const teleferico = telefericos.find(t => t.id === transportId);
-      setNavigationColor(teleferico?.color || COLORS.primary);
-      setNavigationTransportName(teleferico?.nombre || '');
-    } else {
-      const minibus = minibuses.find(m => m.id === transportId);
-      setNavigationColor(COLORS.primary);
-      setNavigationTransportName(minibus ? `Línea ${minibus.linea}` : '');
-    }
-    
-    setNavigationDestination(destination);
-    setShowNavigation(true);
-  }, [telefericos, minibuses]);
-
-  // Ir a ubicación actual
-  const goToCurrentLocation = useCallback(async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permiso denegado', 'Necesitamos acceso a tu ubicación');
-        return;
-      }
-      // El componente MapView manejará el centrado
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  }, []);
-
+// Uber-like "Where to?" component
+function WhereToPanel({ onSearchPress }: { onSearchPress: () => void }) {
   return (
-    <View style={styles.container}>
-      {/* Mapa */}
-      <View style={styles.mapContainer}>
-        {loading ? (
-          <LoadingMap />
-        ) : (
-          <>
-            <MapView
-              routes={showMinibuses ? minibusRoutes : []}
-              stations={showTelefericos ? telefericoStations : []}
-              selectedRouteId={selectedId}
-              onRouteSelect={setSelectedId}
-              height={panelExpanded ? Dimensions.get('window').height * 0.65 : Dimensions.get('window').height * 0.9}
-              showControls={true}
-              trackUserLocation={true}
-              onLongPress={isSelectingOnMap ? handleMapLongPress : undefined}
-            />
-
-            {/* Barra de búsqueda con autocompletado */}
-            <View style={styles.searchContainer}>
-              <SearchAutocomplete
-                minibuses={minibuses}
-                telefericos={telefericos}
-                onSelectSuggestion={handleSelectSuggestion}
-                onSelectPoint={handleSelectPoint}
-                placeholder="¿A dónde quieres ir?"
-              />
-            </View>
-
-            {/* Indicador de modo selección */}
-            {isSelectingOnMap && (
-              <View style={styles.selectModeIndicator}>
-                <Crosshair size={20} color="#fff" />
-                <Text style={styles.selectModeText}>Mantén presionado para seleccionar</Text>
-                <TouchableOpacity 
-                  onPress={() => setIsSelectingOnMap(false)}
-                  style={styles.cancelSelectButton}
-                >
-                  <Text style={styles.cancelSelectText}>Cancelar</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Botón de ubicación */}
-            <TouchableOpacity 
-              style={[styles.locationButton, isSelectingOnMap && styles.locationButtonHidden]}
-              onPress={goToCurrentLocation}
-            >
-              <Navigation size={20} color="#0891b2" />
-            </TouchableOpacity>
-
-            {/* Leyenda */}
-            {!loading && legendItems.length > 0 && (
-              <MapLegend items={legendItems} title="Leyenda" />
-            )}
-          </>
-        )}
-      </View>
-
-      {/* Panel inferior animado */}
-      <Animated.View
-        style={[
-          styles.bottomPanel,
-          {
-            transform: [{
-              translateY: panelAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, panelHeight - 60], // Mantener visible solo el botón de toggle
-              }),
-            }],
-          },
-        ]}
+    <View style={whereToStyles.container}>
+      <LinearGradient
+        colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.9)']}
+        style={whereToStyles.gradient}
       >
-        {/* Botón de toggle */}
-        <TouchableOpacity style={styles.toggleButton} onPress={togglePanel}>
-          {panelExpanded ? (
-            <ChevronDown size={24} color="#6b7280" />
-          ) : (
-            <ChevronUp size={24} color="#6b7280" />
-          )}
+        <Text style={whereToStyles.title}>¿A dónde vas?</Text>
+
+        {/* Search Button */}
+        <TouchableOpacity
+          style={whereToStyles.searchButton}
+          onPress={onSearchPress}
+          activeOpacity={0.8}
+        >
+          <View style={whereToStyles.searchContent}>
+            <View style={whereToStyles.searchIcon}>
+              <MapPin size={20} color="#6B7280" />
+            </View>
+            <Text style={whereToStyles.searchPlaceholder}>
+              Buscar destino...
+            </Text>
+          </View>
         </TouchableOpacity>
 
-        <LinearGradient
-          colors={['#ffffff', '#f8fafc']}
-          style={styles.panelContent}
-        >
-          {/* Handle */}
-          <View style={styles.handle} />
-          
-          <Text style={styles.panelTitle}>Tipo de transporte</Text>
-          
-          {/* Filtros */}
-          <View style={styles.filtersContainer}>
-            <Button
-              title="Todos"
-              onPress={() => setViewMode('all')}
-              variant={viewMode === 'all' ? 'primary' : 'outline'}
-              size="sm"
-              icon={<Layers size={16} color={viewMode === 'all' ? '#fff' : '#0891b2'} />}
-              style={styles.filterButton}
-            />
-            <Button
-              title="Minibus"
-              onPress={() => setViewMode('minibuses')}
-              variant={viewMode === 'minibuses' ? 'primary' : 'outline'}
-              size="sm"
-              icon={<Bus size={16} color={viewMode === 'minibuses' ? '#fff' : '#0891b2'} />}
-              style={styles.filterButton}
-            />
-            <Button
-              title="Teleférico"
-              onPress={() => setViewMode('telefericos')}
-              variant={viewMode === 'telefericos' ? 'primary' : 'outline'}
-              size="sm"
-              icon={<Cable size={16} color={viewMode === 'telefericos' ? '#fff' : '#0891b2'} />}
-              style={styles.filterButton}
-            />
-          </View>
-
-          {/* Stats de transporte */}
-          <View style={styles.statsContainer}>
-            <View style={[styles.statCard, { backgroundColor: '#f0f9ff' }]}>
-              <Bus size={24} color="#0891b2" />
-              <Text style={styles.statNumber}>{minibuses.length}</Text>
-              <Text style={styles.statLabel}>Líneas</Text>
+        {/* Quick Actions */}
+        <View style={whereToStyles.quickActions}>
+          <TouchableOpacity
+            style={whereToStyles.quickAction}
+            onPress={() => console.log("Schedule ride")}
+          >
+            <View style={[whereToStyles.quickIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Clock size={20} color="#0891B2" />
             </View>
-            <View style={[styles.statCard, { backgroundColor: '#fef2f2' }]}>
-              <Cable size={24} color="#ef4444" />
-              <Text style={styles.statNumber}>{telefericos.length}</Text>
-              <Text style={styles.statLabel}>Teleféricos</Text>
+            <Text style={whereToStyles.quickText}>Programar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={whereToStyles.quickAction}
+            onPress={() => console.log("Saved places")}
+          >
+            <View style={[whereToStyles.quickIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Star size={20} color="#F59E0B" />
             </View>
-            <View style={[styles.statCard, { backgroundColor: '#f0fdf4' }]}>
-              <Train size={24} color="#10b981" />
-              <Text style={styles.statNumber}>5</Text>
-              <Text style={styles.statLabel}>PumaKatari</Text>
+            <Text style={whereToStyles.quickText}>Guardados</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={whereToStyles.quickAction}
+            onPress={() => console.log("Round trip")}
+          >
+            <View style={[whereToStyles.quickIcon, { backgroundColor: '#D1FAE5' }]}>
+              <Navigation size={20} color="#10B981" />
             </View>
-          </View>
-
-          {/* Accesos rápidos */}
-          <View style={styles.quickAccessContainer}>
-            <Text style={styles.quickAccessTitle}>Acceso rápido</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.quickAccessScroll}
-            >
-              <TouchableOpacity 
-                style={styles.quickAccessItem}
-                onPress={() => handleSelectPoint(0, 0, 'current_location')}
-              >
-                <View style={[styles.quickAccessIcon, { backgroundColor: '#dcfce7' }]}>
-                  <MapPin size={18} color="#16a34a" />
-                </View>
-                <Text style={styles.quickAccessText}>Cerca de mí</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.quickAccessItem}
-                onPress={() => handleSelectPoint(0, 0, 'select_on_map')}
-              >
-                <View style={[styles.quickAccessIcon, { backgroundColor: '#fef3c7' }]}>
-                  <Crosshair size={18} color="#d97706" />
-                </View>
-                <Text style={styles.quickAccessText}>En el mapa</Text>
-              </TouchableOpacity>
-
-              {telefericos.slice(0, 3).map(t => (
-                <TouchableOpacity 
-                  key={t.id}
-                  style={styles.quickAccessItem}
-                  onPress={() => {
-                    const suggestion: SearchSuggestion = {
-                      id: `teleferico-${t.id}`,
-                      name: t.nombre,
-                      description: `${t.estaciones.length} estaciones`,
-                      type: 'station',
-                      lat: t.estaciones[0]?.lat || 0,
-                      lng: t.estaciones[0]?.lng || 0,
-                      color: t.color,
-                      transportId: t.id,
-                      transportType: 'teleferico',
-                    };
-                    setSelectedDestination(suggestion);
-                    setShowRouteFinder(true);
-                  }}
-                >
-                  <View style={[styles.quickAccessIcon, { backgroundColor: `${t.color}20` }]}>
-                    <Cable size={18} color={t.color} />
-                  </View>
-                  <Text style={styles.quickAccessText} numberOfLines={1}>
-                    {t.nombre.replace('Línea ', '')}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </LinearGradient>
-      </Animated.View>
-
-      {/* Modal de búsqueda de rutas */}
-      <RouteFinderModal
-        visible={showRouteFinder}
-        onClose={() => {
-          setShowRouteFinder(false);
-          setSelectedDestination(null);
-        }}
-        destination={selectedDestination}
-        minibuses={minibuses}
-        telefericos={telefericos}
-        onNavigateToStop={handleNavigateToStop}
-      />
-
-      {/* Modal de navegación */}
-      <NavigationModal
-        visible={showNavigation}
-        destination={navigationDestination}
-        onClose={() => {
-          setShowNavigation(false);
-          setNavigationDestination(null);
-        }}
-        transportColor={navigationColor}
-        transportName={navigationTransportName}
-      />
+            <Text style={whereToStyles.quickText}>Ida y vuelta</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
     </View>
-  );
+  )
 }
+
+const whereToStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 100 : StatusBar.currentHeight || 60, // Moved down from 60/40
+    left: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  gradient: {
+    borderRadius: 16,
+    padding: 16, // Reduced from 20
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 20, // Reduced from 24
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12, // Reduced from 16
+  },
+  searchButton: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12, // Reduced from 16
+    marginBottom: 16, // Reduced from 20
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  searchContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchPlaceholder: {
+    fontSize: 14, // Reduced from 16
+    color: '#9CA3AF',
+    flex: 1,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  quickAction: {
+    alignItems: 'center',
+    paddingVertical: 6, // Reduced from 8
+    paddingHorizontal: 10, // Reduced from 12
+    borderRadius: 8,
+  },
+  quickIcon: {
+    width: 40, // Reduced from 48
+    height: 40, // Reduced from 48
+    borderRadius: 20, // Reduced from 24
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2, // Reduced from 4
+  },
+  quickText: {
+    fontSize: 11, // Reduced from 12
+    color: '#6B7280',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+})
+
+type ViewState = "exploring" | "searching" | "destination" | "routing" | "navigating"
+
+export function MapsScreen() {
+  // Data hooks
+  const { minibuses, loading: loadingMinibuses } = useMinibuses()
+  const { telefericos, loading: loadingTelefericos } = useTelefericos()
+  const { location: userLocation, loading: locating, getCurrentLocation } = useLocation()
+
+  // UI State
+  const [viewState, setViewState] = useState<ViewState>("exploring")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searching, setSearching] = useState(false)
+  const [selectedDestination, setSelectedDestination] = useState<SearchResult | null>(null)
+  const [origin, setOrigin] = useState<{ coord: Coordenada; name: string } | null>(null)
+  const [routeOptions, setRouteOptions] = useState<RouteOption[]>([])
+  const [selectedRoute, setSelectedRoute] = useState<RouteOption | null>(null)
+  const [calculatingRoutes, setCalculatingRoutes] = useState(false)
+
+  const loading = loadingMinibuses || loadingTelefericos
+
+  // Debounced search with rate limiting
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    const timeout = setTimeout(async () => {
+      setSearching(true)
+      try {
+        // Search transport stations first (local data, no API calls)
+        const transportResults = routingService.searchTransportStations(searchQuery, minibuses, telefericos)
+
+        // Only search places if we have transport results or query is specific
+        let placeResults: SearchResult[] = []
+        if (transportResults.length > 0 || searchQuery.length > 3) {
+          placeResults = await routingService.searchPlaces(searchQuery)
+        }
+
+        setSearchResults([...transportResults, ...placeResults])
+      } catch (error) {
+        console.error("Error searching:", error)
+        Alert.alert("Error", "No se pudo realizar la búsqueda")
+      } finally {
+        setSearching(false)
+      }
+    }, 500) // Increased debounce time to reduce API calls
+
+    return () => clearTimeout(timeout)
+  }, [searchQuery, minibuses, telefericos])
+
+  // Handlers
+  const handleResultSelect = useCallback((result: SearchResult) => {
+    setSelectedDestination(result)
+    setSearchQuery(result.name)
+    setSearchResults([])
+    setViewState("destination")
+  }, [])
+
+  const handleGetDirections = useCallback(async () => {
+    if (!selectedDestination) return
+
+    setCalculatingRoutes(true)
+    setViewState("routing")
+
+    try {
+      let originCoord = userLocation
+      let originName = "Tu ubicación"
+
+      if (!originCoord) {
+        originCoord = await getCurrentLocation()
+      }
+
+      if (!originCoord) {
+        originCoord = { lat: -16.4955, lng: -68.1336 }
+        originName = "Plaza Murillo"
+      }
+
+      setOrigin({ coord: originCoord, name: originName })
+
+      const routes = routingService.planRoute(
+        {
+          origin: originCoord,
+          destination: { lat: selectedDestination.lat, lng: selectedDestination.lng },
+          originName,
+          destinationName: selectedDestination.name,
+        },
+        minibuses,
+        telefericos,
+      )
+
+      setRouteOptions(routes)
+      if (routes.length > 0) {
+        setSelectedRoute(routes[0])
+      } else {
+        // No routes found - show message and allow retry
+        Alert.alert(
+          "No se encontraron rutas",
+          "No pudimos encontrar una ruta adecuada entre tu ubicación y el destino. Intenta con otro punto cercano o verifica tu ubicación.",
+          [
+            { text: "Buscar otro destino", style: "default" },
+            {
+              text: "Reintentar",
+              style: "default",
+              onPress: () => {
+                setViewState("destination") // Stay in destination mode to allow retry
+              }
+            }
+          ]
+        )
+      }
+    } catch (error) {
+      console.error("Error calculating routes:", error)
+      Alert.alert("Error", "No se pudieron calcular las rutas")
+    } finally {
+      setCalculatingRoutes(false)
+    }
+  }, [selectedDestination, userLocation, getCurrentLocation, minibuses, telefericos])
+
+  const handleCloseDestination = useCallback(() => {
+    setSelectedDestination(null)
+    setSearchQuery("")
+    setViewState("exploring")
+  }, [])
+
+  const handleCloseRouting = useCallback(() => {
+    setSelectedRoute(null)
+    setRouteOptions([])
+    setViewState("destination")
+  }, [])
+
+  const handleStartNavigation = useCallback(() => {
+    if (selectedRoute) {
+      setViewState("navigating")
+    }
+  }, [selectedRoute])
+
+  const handleExitNavigation = useCallback(() => {
+    // Reset all navigation state and go back to exploring mode
+    setViewState("exploring")
+    setSelectedRoute(null)
+    setRouteOptions([])
+    setOrigin(null)
+    setSelectedDestination(null)
+    setSearchQuery("")
+    setSearchResults([])
+  }, [])
+
+  // Map data
+  const mapMarkers = useMemo(() => {
+    const markers: any[] = []
+
+    if ((viewState === "routing" || viewState === "navigating") && origin && selectedDestination) {
+      markers.push({
+        id: "origin",
+        position: origin.coord,
+        label: origin.name,
+        icon: "origin",
+      })
+      markers.push({
+        id: "destination",
+        position: { lat: selectedDestination.lat, lng: selectedDestination.lng },
+        label: selectedDestination.name,
+        icon: "destination",
+      })
+    } else if (selectedDestination) {
+      markers.push({
+        id: "destination",
+        position: { lat: selectedDestination.lat, lng: selectedDestination.lng },
+        label: selectedDestination.name,
+        icon: "destination",
+      })
+    }
+
+    return markers
+  }, [viewState, origin, selectedDestination])
+
+  const routeSegments = useMemo(() => {
+    if ((viewState !== "routing" && viewState !== "navigating") || !selectedRoute) return []
+    return selectedRoute.segments
+  }, [viewState, selectedRoute])
+
+  // Loading state
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0891B2" />
+      </View>
+    )
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar 
+        barStyle={viewState === "navigating" ? "light-content" : "dark-content"} 
+        backgroundColor={viewState === "navigating" ? "#0891B2" : "#FFFFFF"}
+      />
+      
+      {/* Map */}
+      <View style={styles.mapContainer}>
+        <CartoMap
+          markers={mapMarkers}
+          routeSegments={routeSegments}
+          showUserLocation={true}
+          userLocation={userLocation}
+          theme="voyager"
+        />
+
+        {/* Where To Panel (exploring mode) */}
+        {viewState === "exploring" && (
+          <WhereToPanel onSearchPress={() => setViewState("searching")} />
+        )}
+
+        {/* Search Bar (searching mode) */}
+        {viewState === "searching" && (
+          <View style={styles.searchBarContainer}>
+            <SearchBar
+              placeholder="Buscar estación, ruta o lugar..."
+              value={searchQuery}
+              onChange={setSearchQuery}
+              results={searchResults}
+              isLoading={searching}
+              onResultSelect={handleResultSelect}
+              onBack={() => setViewState("exploring")}
+              onClear={() => {
+                setSearchQuery("")
+                setSelectedDestination(null)
+                setViewState("exploring")
+              }}
+              autoFocus={true}
+            />
+          </View>
+        )}
+
+        {/* Map Controls (hidden during navigation and searching) */}
+        {viewState !== "navigating" && viewState !== "searching" && (
+          <MapControls 
+            onZoomIn={() => console.log("Zoom in")} 
+            onZoomOut={() => console.log("Zoom out")} 
+            onLocate={getCurrentLocation} 
+            locating={locating} 
+          />
+        )}
+
+        {/* Destination Sheet */}
+        {viewState === "destination" && selectedDestination && (
+          <DestinationSheet
+            destination={selectedDestination}
+            onClose={handleCloseDestination}
+            onGetDirections={handleGetDirections}
+          />
+        )}
+
+        {/* Route Preview Sheet */}
+        {viewState === "routing" && selectedDestination && (
+          <RoutePreviewSheet
+            origin={origin?.name || "Tu ubicación"}
+            destination={selectedDestination?.name || "Destino"}
+            routes={routeOptions}
+            selectedRoute={selectedRoute}
+            onSelectRoute={setSelectedRoute}
+            onStartNavigation={handleStartNavigation}
+            onClose={handleCloseRouting}
+            isLoading={calculatingRoutes}
+          />
+        )}
+
+        {/* Navigation Mode */}
+        {viewState === "navigating" && selectedRoute && (
+          <NavigationMode route={selectedRoute} onExit={handleExitNavigation} />
+        )}
+      </View>
+    </SafeAreaView>
+  )
+}
+
+// Need to add useCallback import
+import { useCallback } from "react"
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: "#F3F4F6",
   },
   mapContainer: {
     flex: 1,
-    position: 'relative',
+    position: "relative",
   },
-  searchContainer: {
-    position: 'absolute',
-    top: 50,
+  searchBarContainer: {
+    position: "absolute",
+    top: Platform.OS === 'ios' ? 16 : StatusBar.currentHeight || 16,
     left: 16,
     right: 16,
-    zIndex: 1000,
+    zIndex: 10,
   },
-  locationButton: {
-    position: 'absolute',
-    top: 120,
-    right: 16,
-    width: 48,
-    height: 48,
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  locationButtonHidden: {
-    opacity: 0,
-    pointerEvents: 'none',
-  },
-  selectModeIndicator: {
-    position: 'absolute',
-    top: 120,
-    left: 16,
-    right: 70,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0891b2',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
-    shadowColor: '#0891b2',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  selectModeText: {
+  loadingContainer: {
     flex: 1,
-    color: '#fff',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+})
+
+// Need to add Platform import
+
+// Component for LoadingMap (if needed)
+export function LoadingMap() {
+  return (
+    <View style={loadingStyles.container}>
+      <ActivityIndicator size="large" color="#0891B2" />
+      <Text style={loadingStyles.text}>Cargando mapa...</Text>
+    </View>
+  )
+}
+
+const loadingStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+  text: {
+    marginTop: 12,
     fontSize: 14,
-    fontWeight: '500',
+    color: "#6B7280",
   },
-  cancelSelectButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 8,
-  },
-  cancelSelectText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  bottomPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  toggleButton: {
-    position: 'absolute',
-    top: -30,
-    alignSelf: 'center',
-    width: 60,
-    height: 30,
-    backgroundColor: '#ffffff',
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-    zIndex: 1000,
-  },
-  panelContent: {
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 32,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#d1d5db',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  panelTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 16,
-  },
-  filtersContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-  },
-  filterButton: {
-    flex: 1,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  quickAccessContainer: {
-    marginTop: 4,
-  },
-  quickAccessTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  quickAccessScroll: {
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  quickAccessItem: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 70,
-  },
-  quickAccessIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  quickAccessText: {
-    fontSize: 11,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-});
+})
+
+// Import Text if needed
+
+export default MapsScreen

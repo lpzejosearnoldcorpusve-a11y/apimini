@@ -6,28 +6,28 @@ import type { SearchSuggestion } from "@/types/search"
 import type { Minibus, Teleferico } from "@/types/transport"
 import { LinearGradient } from "expo-linear-gradient"
 import {
-    Building,
-    Bus,
-    Clock,
-    MapPin,
-    Search,
-    Star,
-    Train,
-    X,
+  Building,
+  Bus,
+  Clock,
+  MapPin,
+  Search,
+  Star,
+  Train,
+  X,
 } from "lucide-react-native"
 import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    FlatList,
-    Keyboard,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  FlatList,
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native"
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window")
@@ -357,7 +357,7 @@ export function SearchAutocomplete({
               <View style={styles.noResults}>
                 <Search size={32} color={COLORS.textLight} />
                 <Text style={styles.noResultsText}>
-                  No encontramos resultados para "{query}"
+                  No encontramos resultados para &quot;{query}&quot;
                 </Text>
                 <Text style={styles.noResultsHint}>
                   Intenta con otra búsqueda o selecciona un punto en el mapa

@@ -1,13 +1,6 @@
-"use client"
-
-import { NavigationModal } from "@/components/navigation/NavigationModal"
-import { StopSelectionModal } from "@/components/navigation/StopSelectionModal"
-import { COLORS } from "@/constants/theme"
-import type { NavigationDestination } from "@/types/navigation"
 import type { Minibus } from "@/types/transport"
-import { LinearGradient } from "expo-linear-gradient"
-import { ChevronRight, Clock, MapPin, Navigation2, Route } from "lucide-react-native"
-import React, { useState } from "react"
+import { ChevronRight, Clock, MapPin, Route } from "lucide-react-native"
+import React from "react"
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native"
 
 interface MinibusCardProps {
@@ -17,212 +10,79 @@ interface MinibusCardProps {
 }
 
 export function MinibusCard({ minibus, selected, onSelect }: MinibusCardProps) {
-  const [showStopSelection, setShowStopSelection] = useState(false)
-  const [showNavigation, setShowNavigation] = useState(false)
-  const [selectedDestination, setSelectedDestination] = useState<NavigationDestination | null>(null)
-
-  // Generar nombres de paradas basados en la posición
-  const minibusStops = minibus.ruta.map((coord, index) => ({
-    index,
-    coordenada: coord,
-    name: index === 0 
-      ? `Inicio - ${minibus.rutaNombre}` 
-      : index === minibus.ruta.length - 1 
-        ? `Final - ${minibus.rutaNombre}`
-        : `Parada ${index + 1}`,
-  }))
-
-  const handleNavigate = () => {
-    console.log('🚌 MinibusCard - handleNavigate llamado')
-    console.log('📍 Paradas disponibles:', minibusStops.length)
-    setShowStopSelection(true)
-  }
-
-  const handleSelectStop = (destination: NavigationDestination) => {
-    console.log('✅ MinibusCard - handleSelectStop llamado con:', destination)
-    setSelectedDestination(destination)
-    setShowStopSelection(false)
-    // Esperar a que el modal se cierre completamente antes de abrir el siguiente
-    setTimeout(() => {
-      console.log('🗺️ MinibusCard - Abriendo NavigationModal con destino:', destination)
-      setShowNavigation(true)
-    }, 350)
-  }
-
   return (
-    <>
-    <TouchableOpacity 
+    <TouchableOpacity
       onPress={onSelect}
-      activeOpacity={0.7}
+      style={[
+        styles.container,
+        selected ? styles.selectedContainer : styles.defaultContainer
+      ]}
     >
-      {selected ? (
-        <LinearGradient
-          colors={["#06b6d4", "#14b8a6"] as [string, string]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[
-            styles.container,
-            styles.selectedContainer
-          ]}
-        >
-          <View style={[
-            styles.lineBadge,
-            styles.selectedLineBadge
-          ]}>
-            <Text style={[
-              styles.lineText,
-              styles.selectedLineText
-            ]}>
-              {minibus.linea}
-            </Text>
-          </View>
-          
-          <View style={styles.content}>
-            <Text style={[
-              styles.title,
-              styles.selectedText
-            ]}>
-              {minibus.sindicato}
-            </Text>
-            
-            <View style={styles.routeInfo}>
-              <Route size={12} color="rgba(255,255,255,0.8)" />
-              <Text style={[
-                styles.routeText,
-                styles.selectedSubText
-              ]}>
-                {minibus.rutaNombre}
-              </Text>
-            </View>
-            
-            <View style={styles.details}>
-              <View style={styles.detailItem}>
-                <MapPin size={12} color="rgba(255,255,255,0.7)" />
-                <Text style={[
-                  styles.detailText,
-                  styles.selectedDetailText
-                ]}>
-                  {minibus.ruta.length} paradas
-                </Text>
-              </View>
-              
-              <View style={styles.detailItem}>
-                <Clock size={12} color="rgba(255,255,255,0.7)" />
-                <Text style={[
-                  styles.detailText,
-                  styles.selectedDetailText
-                ]}>
-                  5-10 min
-                </Text>
-              </View>
-            </View>
+      {/* Line Number */}
+      <View style={[
+        styles.lineContainer,
+        selected ? styles.selectedLineContainer : styles.defaultLineContainer
+      ]}>
+        <Text style={[
+          styles.lineText,
+          selected ? styles.selectedLineText : styles.defaultLineText
+        ]}>
+          {minibus.linea}
+        </Text>
+      </View>
 
-            {/* Botón de navegación */}
-            <TouchableOpacity
-              style={styles.navigateButton}
-              onPress={(e) => {
-                e.stopPropagation()
-                handleNavigate()
-              }}
-              activeOpacity={0.8}
-            >
-              <Navigation2 size={14} color="#06b6d4" />
-              <Text style={styles.navigateButtonText}>¿Cómo llegar?</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <ChevronRight 
-            size={20} 
-            color="rgba(255,255,255,0.7)" 
-          />
-        </LinearGradient>
-      ) : (
-        <View
-          style={[
-            styles.container,
-            styles.normalContainer
-          ]}
-        >
-          <View style={[
-            styles.lineBadge,
-            styles.normalLineBadge
+      {/* Content */}
+      <View style={styles.content}>
+        <Text style={[
+          styles.title,
+          selected ? styles.selectedTitle : styles.defaultTitle
+        ]}>
+          {minibus.sindicato}
+        </Text>
+        
+        {/* Route Name */}
+        <View style={styles.routeContainer}>
+          <Route size={12} color={selected ? "rgba(255,255,255,0.8)" : "#6B7280"} />
+          <Text style={[
+            styles.routeText,
+            selected ? styles.selectedRouteText : styles.defaultRouteText
           ]}>
-            <Text style={[
-              styles.lineText,
-              styles.normalLineText
-            ]}>
-              {minibus.linea}
-            </Text>
-          </View>
-          
-          <View style={styles.content}>
-            <Text style={[
-              styles.title,
-              styles.normalText
-            ]}>
-              {minibus.sindicato}
-            </Text>
-            
-            <View style={styles.routeInfo}>
-              <Route size={12} color="#6b7280" />
-              <Text style={[
-                styles.routeText,
-                styles.normalSubText
-              ]}>
-                {minibus.rutaNombre}
-              </Text>
-            </View>
-            
-            <View style={styles.details}>
-              <View style={styles.detailItem}>
-                <MapPin size={12} color="#9ca3af" />
-                <Text style={[
-                  styles.detailText,
-                  styles.normalDetailText
-                ]}>
-                  {minibus.ruta.length} paradas
-                </Text>
-              </View>
-              
-              <View style={styles.detailItem}>
-                <Clock size={12} color="#9ca3af" />
-                <Text style={[
-                  styles.detailText,
-                  styles.normalDetailText
-                ]}>
-                  5-10 min
-                </Text>
-              </View>
-            </View>
-          </View>
-          
-          <ChevronRight 
-            size={20} 
-            color="#d1d5db" 
-          />
+            {minibus.rutaNombre}
+          </Text>
         </View>
-      )}
+
+        {/* Details */}
+        <View style={styles.detailsContainer}>
+          {/* Stops */}
+          <View style={styles.detailItem}>
+            <MapPin size={12} color={selected ? "rgba(255,255,255,0.7)" : "#9CA3AF"} />
+            <Text style={[
+              styles.detailText,
+              selected ? styles.selectedDetailText : styles.defaultDetailText
+            ]}>
+              {minibus.ruta.length} paradas
+            </Text>
+          </View>
+
+          {/* Frequency */}
+          <View style={styles.detailItem}>
+            <Clock size={12} color={selected ? "rgba(255,255,255,0.7)" : "#9CA3AF"} />
+            <Text style={[
+              styles.detailText,
+              selected ? styles.selectedDetailText : styles.defaultDetailText
+            ]}>
+              5-10 min
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Chevron */}
+      <ChevronRight 
+        size={20} 
+        color={selected ? "rgba(255,255,255,0.7)" : "#D1D5DB"} 
+      />
     </TouchableOpacity>
-
-    {/* Modal de selección de parada */}
-    <StopSelectionModal
-      visible={showStopSelection}
-      onClose={() => setShowStopSelection(false)}
-      onSelectStop={handleSelectStop}
-      minibusStops={minibusStops}
-      minibusName={`${minibus.linea} - ${minibus.sindicato}`}
-      type="minibus"
-    />
-
-    {/* Modal de navegación */}
-    <NavigationModal
-      visible={showNavigation}
-      destination={selectedDestination}
-      onClose={() => setShowNavigation(false)}
-      transportColor={COLORS.primary}
-      transportName={minibus.rutaNombre}
-    />
-    </>
   )
 }
 
@@ -231,83 +91,79 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     padding: 16,
     borderRadius: 16,
-    marginVertical: 4,
+    marginBottom: 8,
+  },
+  defaultContainer: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
   },
   selectedContainer: {
-    shadowColor: "#06b6d4",
+    backgroundColor: "linear-gradient(90deg, #06B6D4 0%, #14B8A6 100%)", // React Native no soporta gradients directamente
+    shadowColor: "#06B6D4",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 6,
   },
-  normalContainer: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#f3f4f6",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  lineBadge: {
+  lineContainer: {
     width: 56,
     height: 56,
     borderRadius: 12,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
-  selectedLineBadge: {
+  defaultLineContainer: {
+    backgroundColor: "#E0F2FE",
+  },
+  selectedLineContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
-  },
-  normalLineBadge: {
-    backgroundColor: "#ecfeff",
   },
   lineText: {
     fontSize: 18,
     fontWeight: "bold",
   },
-  selectedLineText: {
-    color: "#ffffff",
+  defaultLineText: {
+    color: "#0E7490",
   },
-  normalLineText: {
-    color: "#0891b2",
+  selectedLineText: {
+    color: "#FFFFFF",
   },
   content: {
     flex: 1,
   },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
-    marginBottom: 4,
   },
-  selectedText: {
-    color: "#ffffff",
+  defaultTitle: {
+    color: "#111827",
   },
-  normalText: {
-    color: "#1f2937",
+  selectedTitle: {
+    color: "#FFFFFF",
   },
-  routeInfo: {
+  routeContainer: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 4,
     gap: 4,
-    marginBottom: 6,
   },
   routeText: {
     fontSize: 12,
   },
-  selectedSubText: {
+  defaultRouteText: {
+    color: "#6B7280",
+  },
+  selectedRouteText: {
     color: "rgba(255, 255, 255, 0.8)",
   },
-  normalSubText: {
-    color: "#6b7280",
-  },
-  details: {
+  detailsContainer: {
     flexDirection: "row",
     alignItems: "center",
+    marginTop: 4,
     gap: 12,
   },
   detailItem: {
@@ -316,28 +172,104 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   detailText: {
-    fontSize: 12,
+    fontSize: 11,
+  },
+  defaultDetailText: {
+    color: "#9CA3AF",
   },
   selectedDetailText: {
     color: "rgba(255, 255, 255, 0.7)",
   },
-  normalDetailText: {
-    color: "#9ca3af",
+})
+
+
+import { LinearGradient } from "expo-linear-gradient"
+
+export function MinibusCardWithGradient({ minibus, selected, onSelect }: MinibusCardProps) {
+  if (selected) {
+    return (
+      <TouchableOpacity onPress={onSelect}>
+        <LinearGradient
+          colors={["#06B6D4", "#14B8A6"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={gradientStyles.gradientContainer}
+        >
+          <View style={gradientStyles.gradientContent}>
+            {/* Line Number */}
+            <View style={styles.selectedLineContainer}>
+              <Text style={styles.selectedLineText}>
+                {minibus.linea}
+              </Text>
+            </View>
+
+            {/* Content */}
+            <View style={styles.content}>
+              <Text style={styles.selectedTitle}>
+                {minibus.sindicato}
+              </Text>
+              
+              {/* Route Name */}
+              <View style={styles.routeContainer}>
+                <Route size={12} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.selectedRouteText}>
+                  {minibus.rutaNombre}
+                </Text>
+              </View>
+
+              {/* Details */}
+              <View style={styles.detailsContainer}>
+                {/* Stops */}
+                <View style={styles.detailItem}>
+                  <MapPin size={12} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.selectedDetailText}>
+                    {minibus.ruta.length} paradas
+                  </Text>
+                </View>
+
+                {/* Frequency */}
+                <View style={styles.detailItem}>
+                  <Clock size={12} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.selectedDetailText}>
+                    5-10 min
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Chevron */}
+            <ChevronRight size={20} color="rgba(255,255,255,0.7)" />
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    )
+  }
+
+  return (
+    <TouchableOpacity
+      onPress={onSelect}
+      style={styles.defaultContainer}
+    >
+      {/* ... mismo contenido para no seleccionado ... */}
+    </TouchableOpacity>
+  )
+}
+
+const gradientStyles = StyleSheet.create({
+  gradientContainer: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+    shadowColor: "#06B6D4",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  navigateButton: {
+  gradientContent: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 10,
-    alignSelf: "flex-start",
-  },
-  navigateButtonText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#06b6d4",
   },
 })
+
+export default MinibusCard

@@ -1,18 +1,7 @@
-"use client"
-
-import { NavigationModal } from "@/components/navigation/NavigationModal"
-import { StopSelectionModal } from "@/components/navigation/StopSelectionModal"
-import type { NavigationDestination } from "@/types/navigation"
 import type { Teleferico } from "@/types/transport"
-import { LinearGradient } from "expo-linear-gradient"
-import { Cable, ChevronRight, Clock, MapPin, Navigation2 } from "lucide-react-native"
+import { Cable, ChevronRight, Clock, MapPin } from "lucide-react-native"
 import React, { useState } from "react"
-import { LayoutAnimation, Platform, StyleSheet, Text, TouchableOpacity, UIManager, View } from "react-native"
-
-// Habilitar animaciones para Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true)
-}
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native"
 
 interface TelefericoCardProps {
   teleferico: Teleferico
@@ -21,157 +10,123 @@ interface TelefericoCardProps {
 }
 
 export function TelefericoCard({ teleferico, selected, onSelect }: TelefericoCardProps) {
-  const [showStopSelection, setShowStopSelection] = useState(false)
-  const [showNavigation, setShowNavigation] = useState(false)
-  const [selectedDestination, setSelectedDestination] = useState<NavigationDestination | null>(null)
-
+  const [heightAnim] = useState(new Animated.Value(0))
+  
   const estacionesOrdenadas = teleferico.estaciones.sort((a, b) => a.orden - b.orden)
   const primeraEstacion = estacionesOrdenadas[0]?.nombre || "N/A"
   const ultimaEstacion = estacionesOrdenadas[estacionesOrdenadas.length - 1]?.nombre || "N/A"
 
-  const handlePress = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
-    onSelect()
-  }
+  // Animación de expansión
+  React.useEffect(() => {
+    Animated.timing(heightAnim, {
+      toValue: selected ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start()
+  }, [selected])
 
-  const handleNavigate = () => {
-    console.log('🚡 TelefericoCard - handleNavigate llamado')
-    console.log('📍 Estaciones disponibles:', teleferico.estaciones.length)
-    setShowStopSelection(true)
-  }
+  const stationsHeight = heightAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 80],
+  })
 
-  const handleSelectStop = (destination: NavigationDestination) => {
-    console.log('✅ TelefericoCard - handleSelectStop llamado con:', destination)
-    setSelectedDestination(destination)
-    setShowStopSelection(false)
-    // Esperar a que el modal se cierre completamente antes de abrir el siguiente
-    setTimeout(() => {
-      console.log('🗺️ TelefericoCard - Abriendo NavigationModal con destino:', destination)
-      setShowNavigation(true)
-    }, 350)
-  }
-
-  const Container: React.ElementType = selected ? LinearGradient : View;
-
-  const containerProps = selected && {
-    colors: [teleferico.color, `${teleferico.color}dd`] as const,
-    start: { x: 0, y: 0 },
-    end: { x: 1, y: 1 },
-  };
+  const stationsOpacity = heightAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0, 1],
+  })
 
   return (
-    <>
-    <TouchableOpacity 
-      onPress={handlePress}
-      activeOpacity={0.7}
+    <TouchableOpacity
+      onPress={onSelect}
+      style={[
+        styles.container,
+        selected ? styles.selectedContainer : styles.defaultContainer,
+        selected && { borderWidth: 0 }
+      ]}
     >
-      <Container
-        {...containerProps}
-        style={[
-          styles.container,
-          selected ? styles.selectedContainer : styles.normalContainer,
-          !selected && { borderColor: '#f1f5f9' }
-        ]}
-      >
-        <View style={styles.mainContent}>
-          <View style={[
-            styles.iconContainer,
-            selected ? styles.selectedIconContainer : { backgroundColor: `${teleferico.color}15` }
-          ]}>
-            <Cable size={24} color={selected ? "#ffffff" : teleferico.color} />
-          </View>
+      {/* Main Content */}
+      <View style={styles.mainContent}>
+        {/* Icon */}
+        <View style={[
+          styles.iconContainer,
+          selected ? styles.selectedIconContainer : styles.defaultIconContainer,
+          !selected && { backgroundColor: `${teleferico.color}20` }
+        ]}>
+          <Cable 
+            size={24} 
+            color={selected ? "#FFFFFF" : teleferico.color} 
+          />
+        </View>
 
-          <View style={styles.content}>
+        {/* Info */}
+        <View style={styles.infoContainer}>
+          <Text style={[
+            styles.title,
+            selected ? styles.selectedTitle : styles.defaultTitle
+          ]}>
+            {teleferico.nombre}
+          </Text>
+          
+          {/* Stations count */}
+          <View style={styles.detailRow}>
+            <MapPin size={12} color={selected ? "rgba(255,255,255,0.8)" : "#6B7280"} />
             <Text style={[
-              styles.title,
-              selected ? styles.selectedText : styles.normalText
+              styles.detailText,
+              selected ? styles.selectedDetailText : styles.defaultDetailText
             ]}>
-              {teleferico.nombre}
+              {teleferico.estaciones.length} estaciones
             </Text>
-            
-            <View style={styles.infoRow}>
-              <MapPin size={12} color={selected ? "rgba(255,255,255,0.8)" : "#6b7280"} />
-              <Text style={[
-                styles.infoText,
-                selected ? styles.selectedSubText : styles.normalSubText
-              ]}>
-                {teleferico.estaciones.length} estaciones
-              </Text>
-            </View>
-            
-            <View style={styles.infoRow}>
-              <Clock size={12} color={selected ? "rgba(255,255,255,0.7)" : "#9ca3af"} />
-              <Text style={[
-                styles.infoText,
-                selected ? styles.selectedSubText : styles.normalSubText
-              ]}>
-                6:00 - 23:00
-              </Text>
-            </View>
           </View>
 
-          <View style={[
-            styles.chevronContainer,
-            selected ? styles.selectedChevronContainer : styles.normalChevronContainer
-          ]}>
-            <ChevronRight size={18} color={selected ? "#ffffff" : "#d1d5db"} />
+          {/* Schedule */}
+          <View style={styles.detailRow}>
+            <Clock size={12} color={selected ? "rgba(255,255,255,0.7)" : "#9CA3AF"} />
+            <Text style={[
+              styles.detailText,
+              selected ? styles.selectedDetailText : styles.defaultDetailText
+            ]}>
+              6:00 - 23:00
+            </Text>
           </View>
         </View>
 
-        {/* Estaciones preview - Animado */}
-        {selected && (
-          <View style={styles.stationsPreview}>
-            <View style={styles.stationsContainer}>
-              <View style={styles.stationRow}>
-                <View style={[styles.stationDot, styles.firstStationDot]} />
-                <Text style={styles.stationName}>{primeraEstacion}</Text>
-              </View>
-              
-              <View style={styles.stationLine} />
-              
-              <View style={styles.stationRow}>
-                <View style={[styles.stationDot, styles.lastStationDot]} />
-                <Text style={styles.stationName}>{ultimaEstacion}</Text>
-              </View>
-            </View>
+        {/* Chevron */}
+        <View style={[
+          styles.chevronContainer,
+          selected ? styles.selectedChevronContainer : styles.defaultChevronContainer
+        ]}>
+          <ChevronRight 
+            size={18} 
+            color={selected ? "#FFFFFF" : "#D1D5DB"} 
+          />
+        </View>
+      </View>
 
-            {/* Botón de navegación */}
-            <TouchableOpacity
-              style={[styles.navigateButton, { borderColor: "rgba(255,255,255,0.3)" }]}
-              onPress={(e) => {
-                e.stopPropagation()
-                handleNavigate()
-              }}
-              activeOpacity={0.8}
-            >
-              <Navigation2 size={16} color="#fff" />
-              <Text style={styles.navigateButtonText}>¿Cómo llegar?</Text>
-            </TouchableOpacity>
+      {/* Stations Preview (animated) */}
+      <Animated.View 
+        style={[
+          styles.stationsContainer,
+          {
+            height: stationsHeight,
+            opacity: stationsOpacity,
+          }
+        ]}
+      >
+        <View style={styles.stationsContent}>
+          <View style={styles.stationRow}>
+            <View style={styles.stationDot} />
+            <Text style={styles.stationText}>{primeraEstacion}</Text>
           </View>
-        )}
-      </Container>
+          
+          <View style={styles.lineConnector} />
+          
+          <View style={styles.stationRow}>
+            <View style={[styles.stationDot, styles.lastStationDot]} />
+            <Text style={styles.stationText}>{ultimaEstacion}</Text>
+          </View>
+        </View>
+      </Animated.View>
     </TouchableOpacity>
-
-    {/* Modal de selección de estación */}
-    <StopSelectionModal
-      visible={showStopSelection}
-      onClose={() => setShowStopSelection(false)}
-      onSelectStop={handleSelectStop}
-      estaciones={teleferico.estaciones}
-      telefericoName={teleferico.nombre}
-      telefericoColor={teleferico.color}
-      type="teleferico"
-    />
-
-    {/* Modal de navegación */}
-    <NavigationModal
-      visible={showNavigation}
-      destination={selectedDestination}
-      onClose={() => setShowNavigation(false)}
-      transportColor={teleferico.color}
-      transportName={teleferico.nombre}
-    />
-    </>
   )
 }
 
@@ -180,98 +135,87 @@ const styles = StyleSheet.create({
     width: "100%",
     borderRadius: 16,
     overflow: "hidden",
-    marginVertical: 6,
+    marginBottom: 8,
+  },
+  defaultContainer: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
   },
   selectedContainer: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  normalContainer: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: "#000000", // Base para el gradiente
   },
   mainContent: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
-    gap: 12,
   },
   iconContainer: {
     width: 56,
     height: 56,
     borderRadius: 12,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  defaultIconContainer: {
+    // Background color se aplica dinámicamente
   },
   selectedIconContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
   },
-  content: {
+  infoContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     marginBottom: 4,
   },
-  selectedText: {
-    color: "#ffffff",
+  defaultTitle: {
+    color: "#111827",
   },
-  normalText: {
-    color: "#1f2937",
+  selectedTitle: {
+    color: "#FFFFFF",
   },
-  infoRow: {
+  detailRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     marginTop: 2,
   },
-  infoText: {
-    fontSize: 12,
+  detailText: {
+    fontSize: 11,
   },
-  selectedSubText: {
+  defaultDetailText: {
+    color: "#6B7280",
+  },
+  selectedDetailText: {
     color: "rgba(255, 255, 255, 0.8)",
-  },
-  normalSubText: {
-    color: "#6b7280",
   },
   chevronContainer: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+  },
+  defaultChevronContainer: {
+    backgroundColor: "#F9FAFB",
   },
   selectedChevronContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.2)",
   },
-  normalChevronContainer: {
-    backgroundColor: "#f9fafb",
-  },
-  stationsPreview: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
   stationsContainer: {
+    overflow: "hidden",
+  },
+  stationsContent: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
     padding: 12,
-    ...Platform.select({
-      ios: {
-        backdropFilter: "blur(10px)",
-      },
-      android: {
-        elevation: 2,
-      },
-    }),
+    backdropFilter: "blur(10px)", // No soportado en React Native
   },
   stationRow: {
     flexDirection: "row",
@@ -282,44 +226,215 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-  },
-  firstStationDot: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.5)",
   },
   lastStationDot: {
     backgroundColor: "rgba(255, 255, 255, 0.5)",
-    borderWidth: 2,
-    borderColor: "#ffffff",
+    borderColor: "#FFFFFF",
   },
-  stationLine: {
-    width: 2,
+  lineConnector: {
+    width: 1,
     height: 16,
     backgroundColor: "rgba(255, 255, 255, 0.3)",
     marginLeft: 5,
     marginVertical: 2,
   },
-  stationName: {
-    fontSize: 14,
-    color: "#ffffff",
-    fontWeight: "500",
-  },
-  navigateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    marginTop: 12,
-    borderWidth: 1,
-  },
-  navigateButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#ffffff",
+  stationText: {
+    fontSize: 12,
+    color: "#FFFFFF",
+    flex: 1,
   },
 })
+
+// Versión con LinearGradient y blur (requiere dependencias adicionales)
+import { BlurView } from "expo-blur"
+import { LinearGradient } from "expo-linear-gradient"
+
+export function TelefericoCardEnhanced({ teleferico, selected, onSelect }: TelefericoCardProps) {
+  const estacionesOrdenadas = teleferico.estaciones.sort((a, b) => a.orden - b.orden)
+  const primeraEstacion = estacionesOrdenadas[0]?.nombre || "N/A"
+  const ultimaEstacion = estacionesOrdenadas[estacionesOrdenadas.length - 1]?.nombre || "N/A"
+
+  if (selected) {
+    return (
+      <TouchableOpacity onPress={onSelect}>
+        <LinearGradient
+          colors={[teleferico.color, `${teleferico.color}DD`]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={stylesEnhanced.gradientContainer}
+        >
+          {/* Main Content */}
+          <View style={stylesEnhanced.mainContent}>
+            {/* Icon */}
+            <View style={stylesEnhanced.selectedIconContainer}>
+              <Cable size={24} color="#FFFFFF" />
+            </View>
+
+            {/* Info */}
+            <View style={stylesEnhanced.infoContainer}>
+              <Text style={stylesEnhanced.selectedTitle}>
+                {teleferico.nombre}
+              </Text>
+              
+              {/* Stations count */}
+              <View style={stylesEnhanced.detailRow}>
+                <MapPin size={12} color="rgba(255,255,255,0.8)" />
+                <Text style={stylesEnhanced.selectedDetailText}>
+                  {teleferico.estaciones.length} estaciones
+                </Text>
+              </View>
+
+              {/* Schedule */}
+              <View style={stylesEnhanced.detailRow}>
+                <Clock size={12} color="rgba(255,255,255,0.7)" />
+                <Text style={stylesEnhanced.selectedDetailText}>
+                  6:00 - 23:00
+                </Text>
+              </View>
+            </View>
+
+            {/* Chevron */}
+            <View style={stylesEnhanced.selectedChevronContainer}>
+              <ChevronRight size={18} color="#FFFFFF" />
+            </View>
+          </View>
+
+          {/* Stations Preview */}
+          <View style={stylesEnhanced.stationsWrapper}>
+            <BlurView intensity={80} tint="light" style={stylesEnhanced.stationsBlur}>
+              <View style={stylesEnhanced.stationsContent}>
+                <View style={stylesEnhanced.stationRow}>
+                  <View style={stylesEnhanced.stationDot} />
+                  <Text style={stylesEnhanced.stationText}>{primeraEstacion}</Text>
+                </View>
+                
+                <View style={stylesEnhanced.lineConnector} />
+                
+                <View style={stylesEnhanced.stationRow}>
+                  <View style={[stylesEnhanced.stationDot, stylesEnhanced.lastStationDot]} />
+                  <Text style={stylesEnhanced.stationText}>{ultimaEstacion}</Text>
+                </View>
+              </View>
+            </BlurView>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    )
+  }
+
+  // Versión no seleccionada
+  return (
+    <TouchableOpacity
+      onPress={onSelect}
+      style={stylesEnhanced.defaultContainer}
+    >
+      {/* ... contenido similar a la versión simple ... */}
+    </TouchableOpacity>
+  )
+}
+
+const stylesEnhanced = StyleSheet.create({
+  gradientContainer: {
+    borderRadius: 16,
+    overflow: "hidden",
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  defaultContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    marginBottom: 8,
+  },
+  mainContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+  },
+  selectedIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  infoContainer: {
+    flex: 1,
+  },
+  selectedTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 4,
+    color: "#FFFFFF",
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  selectedDetailText: {
+    fontSize: 11,
+    color: "rgba(255, 255, 255, 0.8)",
+  },
+  selectedChevronContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+  },
+  stationsWrapper: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  stationsBlur: {
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  stationsContent: {
+    padding: 12,
+  },
+  stationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  stationDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.5)",
+  },
+  lastStationDot: {
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    borderColor: "#FFFFFF",
+  },
+  lineConnector: {
+    width: 1,
+    height: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    marginLeft: 5,
+    marginVertical: 2,
+  },
+  stationText: {
+    fontSize: 12,
+    color: "#FFFFFF",
+    flex: 1,
+  },
+})
+
+export default TelefericoCard

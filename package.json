@@ -62,11 +62,12 @@
     "typescript": "~5.9.2"
   },
   "private": true,
-  
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["react-native-nfc-manager"]
+        "exclude": [
+          "react-native-nfc-manager"
+        ]
       }
     }
   }
