@@ -35,13 +35,20 @@ export function TelefericoCard({ teleferico, selected, onSelect }: TelefericoCar
   }
 
   const handleNavigate = () => {
+    console.log('🚡 TelefericoCard - handleNavigate llamado')
+    console.log('📍 Estaciones disponibles:', teleferico.estaciones.length)
     setShowStopSelection(true)
   }
 
   const handleSelectStop = (destination: NavigationDestination) => {
+    console.log('✅ TelefericoCard - handleSelectStop llamado con:', destination)
     setSelectedDestination(destination)
     setShowStopSelection(false)
-    setShowNavigation(true)
+    // Esperar a que el modal se cierre completamente antes de abrir el siguiente
+    setTimeout(() => {
+      console.log('🗺️ TelefericoCard - Abriendo NavigationModal con destino:', destination)
+      setShowNavigation(true)
+    }, 350)
   }
 
   const Container: React.ElementType = selected ? LinearGradient : View;
@@ -131,7 +138,10 @@ export function TelefericoCard({ teleferico, selected, onSelect }: TelefericoCar
             {/* Botón de navegación */}
             <TouchableOpacity
               style={[styles.navigateButton, { borderColor: "rgba(255,255,255,0.3)" }]}
-              onPress={handleNavigate}
+              onPress={(e) => {
+                e.stopPropagation()
+                handleNavigate()
+              }}
               activeOpacity={0.8}
             >
               <Navigation2 size={16} color="#fff" />

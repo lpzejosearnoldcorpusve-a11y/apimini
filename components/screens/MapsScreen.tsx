@@ -1,21 +1,28 @@
 import { LoadingMap } from '@/components/maps/LoadingMap';
 import { MapLegend } from '@/components/maps/MapLegend';
 import { MapView } from '@/components/maps/MapView';
-import { TransportCard } from '@/components/maps/TransportCard';
+import { RouteFinderModal } from '@/components/maps/RouteFinderModal';
+import { SearchAutocomplete } from '@/components/maps/SearchAutocomplete';
+import { NavigationModal } from '@/components/navigation/NavigationModal';
 import { Button } from '@/components/ui/Button';
+import { COLORS } from '@/constants/theme';
 import { useMinibuses, useTelefericos } from '@/hooks/useTransport';
+import { searchService } from '@/services/searchService';
+import type { NavigationDestination } from '@/types/navigation';
+import type { SearchSuggestion } from '@/types/search';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bus, Cable, ChevronDown, ChevronUp, Layers, Navigation, Search, Train } from 'lucide-react-native';
-import React, { useRef, useState } from 'react';
+import * as Location from 'expo-location';
+import { Bus, Cable, ChevronDown, ChevronUp, Crosshair, Layers, MapPin, Navigation, Train } from 'lucide-react-native';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 type ViewMode = 'all' | 'minibuses' | 'telefericos';
@@ -25,9 +32,17 @@ export function MapsScreen() {
   const { telefericos, loading: loadingTelefericos } = useTelefericos();
   const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [panelExpanded, setPanelExpanded] = useState(true);
   const panelAnimation = useRef(new Animated.Value(0)).current;
+  
+  // Estados para búsqueda y navegación
+  const [isSelectingOnMap, setIsSelectingOnMap] = useState(false);
+  const [selectedDestination, setSelectedDestination] = useState<SearchSuggestion | null>(null);
+  const [showRouteFinder, setShowRouteFinder] = useState(false);
+  const [showNavigation, setShowNavigation] = useState(false);
+  const [navigationDestination, setNavigationDestination] = useState<NavigationDestination | null>(null);
+  const [navigationColor, setNavigationColor] = useState(COLORS.primary);
+  const [navigationTransportName, setNavigationTransportName] = useState('');
 
   const loading = loadingMinibuses || loadingTelefericos;
 
@@ -67,16 +82,6 @@ export function MapsScreen() {
   const showMinibuses = viewMode === 'all' || viewMode === 'minibuses';
   const showTelefericos = viewMode === 'all' || viewMode === 'telefericos';
 
-  // Filtrado basado en búsqueda
-  const filteredMinibuses = minibuses.filter(m =>
-    m.linea.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    m.sindicato.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredTelefericos = telefericos.filter(t =>
-    t.nombre.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   // Items para la leyenda
   const legendItems = [
     ...(showMinibuses ? [{
@@ -90,6 +95,140 @@ export function MapsScreen() {
       type: 'dashed' as const,
     })) : []),
   ];
+
+  // Manejar selección desde autocompletado
+  const handleSelectSuggestion = useCallback((suggestion: SearchSuggestion) => {
+    console.log('🔍 Sugerencia seleccionada:', suggestion);
+    setSelectedDestination(suggestion);
+    
+    // Si es una parada o estación directa, navegar inmediatamente
+    if (suggestion.type === 'stop' || suggestion.type === 'station') {
+      const dest: NavigationDestination = {
+        name: suggestion.name,
+        lat: suggestion.lat,
+        lng: suggestion.lng,
+        type: suggestion.type === 'station' ? 'estacion' : 'parada',
+      };
+      
+      // Encontrar el color del transporte
+      if (suggestion.transportType === 'teleferico' && suggestion.transportId) {
+        const teleferico = telefericos.find(t => t.id === suggestion.transportId);
+        setNavigationColor(teleferico?.color || COLORS.primary);
+        setNavigationTransportName(teleferico?.nombre || '');
+      } else {
+        setNavigationColor(COLORS.primary);
+        if (suggestion.transportId) {
+          const minibus = minibuses.find(m => m.id === suggestion.transportId);
+          setNavigationTransportName(minibus ? `Línea ${minibus.linea}` : '');
+        }
+      }
+      
+      setNavigationDestination(dest);
+      setShowNavigation(true);
+    } else {
+      // Si es una zona o calle, mostrar rutas cercanas
+      setShowRouteFinder(true);
+    }
+  }, [telefericos, minibuses]);
+
+  // Manejar selección de punto en mapa
+  const handleSelectPoint = useCallback(async (lat: number, lng: number, action: string) => {
+    if (action === 'current_location') {
+      // Obtener ubicación actual
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permiso denegado', 'Necesitamos acceso a tu ubicación');
+          return;
+        }
+        
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        
+        const address = await searchService.reverseGeocode(
+          location.coords.latitude,
+          location.coords.longitude
+        );
+        
+        setSelectedDestination({
+          id: 'current-location',
+          name: 'Mi ubicación actual',
+          description: address,
+          type: 'custom',
+          lat: location.coords.latitude,
+          lng: location.coords.longitude,
+        });
+        setShowRouteFinder(true);
+      } catch (error) {
+        console.error('Error obteniendo ubicación:', error);
+        Alert.alert('Error', 'No se pudo obtener tu ubicación');
+      }
+    } else if (action === 'select_on_map') {
+      // Activar modo de selección en mapa
+      setIsSelectingOnMap(true);
+      setPanelExpanded(false);
+      panelAnimation.setValue(1);
+      Alert.alert(
+        'Selecciona un punto',
+        'Mantén presionado en el mapa para seleccionar un destino',
+        [{ text: 'Entendido' }]
+      );
+    }
+  }, [panelAnimation]);
+
+  // Manejar selección de punto desde el mapa
+  const handleMapLongPress = useCallback(async (lat: number, lng: number) => {
+    if (!isSelectingOnMap) return;
+    
+    setIsSelectingOnMap(false);
+    
+    const address = await searchService.reverseGeocode(lat, lng);
+    
+    setSelectedDestination({
+      id: `map-point-${Date.now()}`,
+      name: address,
+      description: 'Punto seleccionado en el mapa',
+      type: 'custom',
+      lat,
+      lng,
+    });
+    setShowRouteFinder(true);
+  }, [isSelectingOnMap]);
+
+  // Manejar navegación desde RouteFinderModal
+  const handleNavigateToStop = useCallback((
+    destination: NavigationDestination,
+    transportType: 'minibus' | 'teleferico',
+    transportId: string
+  ) => {
+    if (transportType === 'teleferico') {
+      const teleferico = telefericos.find(t => t.id === transportId);
+      setNavigationColor(teleferico?.color || COLORS.primary);
+      setNavigationTransportName(teleferico?.nombre || '');
+    } else {
+      const minibus = minibuses.find(m => m.id === transportId);
+      setNavigationColor(COLORS.primary);
+      setNavigationTransportName(minibus ? `Línea ${minibus.linea}` : '');
+    }
+    
+    setNavigationDestination(destination);
+    setShowNavigation(true);
+  }, [telefericos, minibuses]);
+
+  // Ir a ubicación actual
+  const goToCurrentLocation = useCallback(async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'Necesitamos acceso a tu ubicación');
+        return;
+      }
+      // El componente MapView manejará el centrado
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -107,24 +246,39 @@ export function MapsScreen() {
               height={panelExpanded ? Dimensions.get('window').height * 0.65 : Dimensions.get('window').height * 0.9}
               showControls={true}
               trackUserLocation={true}
+              onLongPress={isSelectingOnMap ? handleMapLongPress : undefined}
             />
 
-            {/* Barra de búsqueda */}
+            {/* Barra de búsqueda con autocompletado */}
             <View style={styles.searchContainer}>
-              <View style={styles.searchBar}>
-                <Search size={20} color="#9ca3af" />
-                <TextInput
-                  placeholder="Buscar ubicación, ruta o estación..."
-                  placeholderTextColor="#9ca3af"
-                  style={styles.searchInput}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-              </View>
+              <SearchAutocomplete
+                minibuses={minibuses}
+                telefericos={telefericos}
+                onSelectSuggestion={handleSelectSuggestion}
+                onSelectPoint={handleSelectPoint}
+                placeholder="¿A dónde quieres ir?"
+              />
             </View>
 
+            {/* Indicador de modo selección */}
+            {isSelectingOnMap && (
+              <View style={styles.selectModeIndicator}>
+                <Crosshair size={20} color="#fff" />
+                <Text style={styles.selectModeText}>Mantén presionado para seleccionar</Text>
+                <TouchableOpacity 
+                  onPress={() => setIsSelectingOnMap(false)}
+                  style={styles.cancelSelectButton}
+                >
+                  <Text style={styles.cancelSelectText}>Cancelar</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Botón de ubicación */}
-            <TouchableOpacity style={styles.locationButton}>
+            <TouchableOpacity 
+              style={[styles.locationButton, isSelectingOnMap && styles.locationButtonHidden]}
+              onPress={goToCurrentLocation}
+            >
               <Navigation size={20} color="#0891b2" />
             </TouchableOpacity>
 
@@ -215,38 +369,91 @@ export function MapsScreen() {
             </View>
           </View>
 
-          {/* Lista de transporte filtrada */}
-          {searchQuery ? (
-            <ScrollView style={styles.transportList} showsVerticalScrollIndicator={false}>
-              {showMinibuses && filteredMinibuses.map((minibus) => (
-                <TransportCard
-                  key={`minibus-${minibus.id}`}
-                  type="minibus"
-                  title={`Línea ${minibus.linea}`}
-                  subtitle={minibus.sindicato}
-                  color="#0891b2"
-                  info={`10-15 min`}
-                  selected={selectedId === minibus.id}
-                  onClick={() => setSelectedId(minibus.id)}
-                />
-              ))}
+          {/* Accesos rápidos */}
+          <View style={styles.quickAccessContainer}>
+            <Text style={styles.quickAccessTitle}>Acceso rápido</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.quickAccessScroll}
+            >
+              <TouchableOpacity 
+                style={styles.quickAccessItem}
+                onPress={() => handleSelectPoint(0, 0, 'current_location')}
+              >
+                <View style={[styles.quickAccessIcon, { backgroundColor: '#dcfce7' }]}>
+                  <MapPin size={18} color="#16a34a" />
+                </View>
+                <Text style={styles.quickAccessText}>Cerca de mí</Text>
+              </TouchableOpacity>
               
-              {showTelefericos && filteredTelefericos.map((teleferico) => (
-                <TransportCard
-                  key={`teleferico-${teleferico.id}`}
-                  type="teleferico"
-                  title={teleferico.nombre}
-                  subtitle={`${teleferico.estaciones.length} estaciones`}
-                  color={teleferico.color}
-                  info={`${teleferico.estaciones.length} estaciones`}
-                  selected={selectedId === teleferico.id}
-                  onClick={() => setSelectedId(teleferico.id)}
-                />
+              <TouchableOpacity 
+                style={styles.quickAccessItem}
+                onPress={() => handleSelectPoint(0, 0, 'select_on_map')}
+              >
+                <View style={[styles.quickAccessIcon, { backgroundColor: '#fef3c7' }]}>
+                  <Crosshair size={18} color="#d97706" />
+                </View>
+                <Text style={styles.quickAccessText}>En el mapa</Text>
+              </TouchableOpacity>
+
+              {telefericos.slice(0, 3).map(t => (
+                <TouchableOpacity 
+                  key={t.id}
+                  style={styles.quickAccessItem}
+                  onPress={() => {
+                    const suggestion: SearchSuggestion = {
+                      id: `teleferico-${t.id}`,
+                      name: t.nombre,
+                      description: `${t.estaciones.length} estaciones`,
+                      type: 'station',
+                      lat: t.estaciones[0]?.lat || 0,
+                      lng: t.estaciones[0]?.lng || 0,
+                      color: t.color,
+                      transportId: t.id,
+                      transportType: 'teleferico',
+                    };
+                    setSelectedDestination(suggestion);
+                    setShowRouteFinder(true);
+                  }}
+                >
+                  <View style={[styles.quickAccessIcon, { backgroundColor: `${t.color}20` }]}>
+                    <Cable size={18} color={t.color} />
+                  </View>
+                  <Text style={styles.quickAccessText} numberOfLines={1}>
+                    {t.nombre.replace('Línea ', '')}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </ScrollView>
-          ) : null}
+          </View>
         </LinearGradient>
       </Animated.View>
+
+      {/* Modal de búsqueda de rutas */}
+      <RouteFinderModal
+        visible={showRouteFinder}
+        onClose={() => {
+          setShowRouteFinder(false);
+          setSelectedDestination(null);
+        }}
+        destination={selectedDestination}
+        minibuses={minibuses}
+        telefericos={telefericos}
+        onNavigateToStop={handleNavigateToStop}
+      />
+
+      {/* Modal de navegación */}
+      <NavigationModal
+        visible={showNavigation}
+        destination={navigationDestination}
+        onClose={() => {
+          setShowNavigation(false);
+          setNavigationDestination(null);
+        }}
+        transportColor={navigationColor}
+        transportName={navigationTransportName}
+      />
     </View>
   );
 }
@@ -265,34 +472,11 @@ const styles = StyleSheet.create({
     top: 50,
     left: 16,
     right: 16,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: '#f3f4f6',
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    color: '#111827',
+    zIndex: 1000,
   },
   locationButton: {
     position: 'absolute',
-    top: 110,
+    top: 120,
     right: 16,
     width: 48,
     height: 48,
@@ -310,6 +494,45 @@ const styles = StyleSheet.create({
     elevation: 4,
     borderWidth: 1,
     borderColor: '#f1f5f9',
+  },
+  locationButtonHidden: {
+    opacity: 0,
+    pointerEvents: 'none',
+  },
+  selectModeIndicator: {
+    position: 'absolute',
+    top: 120,
+    left: 16,
+    right: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0891b2',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+    shadowColor: '#0891b2',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  selectModeText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  cancelSelectButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 8,
+  },
+  cancelSelectText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   bottomPanel: {
     position: 'absolute',
@@ -409,8 +632,35 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     marginTop: 4,
   },
-  transportList: {
-    maxHeight: 200,
-    marginTop: 8,
+  quickAccessContainer: {
+    marginTop: 4,
+  },
+  quickAccessTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  quickAccessScroll: {
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  quickAccessItem: {
+    alignItems: 'center',
+    marginRight: 16,
+    width: 70,
+  },
+  quickAccessIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  quickAccessText: {
+    fontSize: 11,
+    color: '#6b7280',
+    textAlign: 'center',
   },
 });

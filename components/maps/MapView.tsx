@@ -52,6 +52,7 @@ interface MapViewProps {
   }>;
   selectedRouteId?: string | null;
   onRouteSelect?: (id: string) => void;
+  onLongPress?: (lat: number, lng: number) => void;
   zoom?: number;
   height?: number;
   showControls?: boolean;
@@ -64,6 +65,7 @@ export function MapViewComponent({
   stations = [],
   selectedRouteId,
   onRouteSelect,
+  onLongPress,
   zoom = 13,
   height = Dimensions.get('window').height * 0.7,
   showControls = true,
@@ -226,6 +228,12 @@ export function MapViewComponent({
           console.log('✅ Mapa cargado correctamente');
           setIsMapReady(true);
           setMapError(false);
+        }}
+        onLongPress={(e) => {
+          if (onLongPress) {
+            const { latitude, longitude } = e.nativeEvent.coordinate;
+            onLongPress(latitude, longitude);
+          }
         }}
         showsUserLocation={false}
         showsMyLocationButton={false}

@@ -3,7 +3,6 @@
 import { BORDER_RADIUS, COLORS, FONT_SIZES, SHADOWS, SPACING } from "@/constants/theme"
 import type { NavigationDestination } from "@/types/navigation"
 import type { Coordenada, Estacion } from "@/types/transport"
-import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
 import {
     ArrowRight,
@@ -14,11 +13,13 @@ import {
     Navigation2,
     X,
 } from "lucide-react-native"
-import React, { useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import {
+    Animated,
     Dimensions,
     Modal,
     Platform,
+    Pressable,
     ScrollView,
     StyleSheet,
     Text,
@@ -26,7 +27,7 @@ import {
     View
 } from "react-native"
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window")
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window")
 
 type StopType = 'inicio' | 'fin'
 
@@ -65,51 +66,116 @@ export function StopSelectionModal({
   type,
 }: StopSelectionModalProps) {
   const [selectedType, setSelectedType] = useState<StopType>('inicio')
+  const [isClosing, setIsClosing] = useState(false)
+  const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current
 
   const themeColor = type === 'teleferico' ? telefericoColor : COLORS.primary
   const transportName = type === 'teleferico' ? telefericoName : minibusName
 
-  const handleSelectStop = (stop: { name: string; lat: number; lng: number }) => {
+  // Animación de entrada
+  useEffect(() => {
+    if (visible) {
+      setIsClosing(false)
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+      }).start()
+    }
+  }, [visible])
+
+  // Animación de salida
+  const handleClose = useCallback(() => {
+    if (isClosing) return
+    setIsClosing(true)
+    
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 250,
+      useNativeDriver: true,
+    }).start(() => {
+      onClose()
+      setIsClosing(false)
+    })
+  }, [isClosing, onClose, slideAnim])
+
+  const handleSelectStop = useCallback((stop: { name: string; lat: number; lng: number }) => {
+    console.log('🎯 StopSelectionModal - handleSelectStop llamado con:', stop)
+    
+    if (!stop.lat || !stop.lng) {
+      console.error('❌ Coordenadas inválidas:', stop)
+      return
+    }
+    
     const destination: NavigationDestination = {
       name: stop.name,
       lat: stop.lat,
       lng: stop.lng,
       type: type === 'teleferico' ? 'estacion' : 'parada',
     }
-    onSelectStop(destination)
-  }
+    console.log('📍 Destino creado:', destination)
+    
+    // Primero cerramos el modal con animación
+    setIsClosing(true)
+    Animated.timing(slideAnim, {
+      toValue: SCREEN_HEIGHT,
+      duration: 200,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsClosing(false)
+      // Luego llamamos al callback con el destino
+      onSelectStop(destination)
+    })
+  }, [type, onSelectStop, slideAnim])
 
   // Obtener paradas de inicio y fin
-  const getStartAndEndStops = () => {
-    if (type === 'teleferico' && estaciones) {
+  const getStartAndEndStops = useCallback(() => {
+    if (type === 'teleferico' && estaciones && estaciones.length > 0) {
       const sorted = [...estaciones].sort((a, b) => a.orden - b.orden)
       return {
         inicio: sorted[0],
         fin: sorted[sorted.length - 1],
       }
-    } else if (type === 'minibus' && minibusStops) {
+    } else if (type === 'minibus' && minibusStops && minibusStops.length > 0) {
       return {
         inicio: minibusStops[0],
         fin: minibusStops[minibusStops.length - 1],
       }
     }
     return { inicio: null, fin: null }
-  }
+  }, [type, estaciones, minibusStops])
 
   const { inicio, fin } = getStartAndEndStops()
+
+  // Solo loggear cuando sea visible
+  useEffect(() => {
+    if (visible && inicio && fin) {
+      const inicioName = type === 'teleferico' ? (inicio as Estacion).nombre : (inicio as MinibusStop).name
+      const finName = type === 'teleferico' ? (fin as Estacion).nombre : (fin as MinibusStop).name
+      console.log('📋 StopSelectionModal abierto - inicio:', inicioName, 'fin:', finName)
+    }
+  }, [visible, inicio, fin, type])
 
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="none"
       transparent
       statusBarTranslucent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        <BlurView intensity={30} tint="dark" style={styles.blurOverlay} />
+        {/* Área para cerrar al tocar fuera */}
+        <Pressable style={styles.dismissArea} onPress={handleClose} />
         
-        <View style={styles.modalContainer}>
+        {/* Contenedor del modal */}
+        <Animated.View 
+          style={[
+            styles.modalContainer,
+            { transform: [{ translateY: slideAnim }] }
+          ]}
+        >
           {/* Header */}
           <LinearGradient
             colors={[themeColor, `${themeColor}dd`]}
@@ -125,7 +191,7 @@ export function StopSelectionModal({
                 <Text style={styles.headerTitle}>¿Cómo llegar?</Text>
                 <Text style={styles.headerSubtitle}>{transportName}</Text>
               </View>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
                 <X size={24} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -360,7 +426,7 @@ export function StopSelectionModal({
               </View>
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   )
@@ -369,10 +435,10 @@ export function StopSelectionModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
-  blurOverlay: {
-    ...StyleSheet.absoluteFillObject,
+  dismissArea: {
+    flex: 1,
   },
   modalContainer: {
     backgroundColor: COLORS.background,

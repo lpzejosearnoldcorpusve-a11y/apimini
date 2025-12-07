@@ -2,10 +2,10 @@
 
 import { BORDER_RADIUS, COLORS, FONT_SIZES, SHADOWS, SPACING } from "@/constants/theme"
 import type { NavigationDestination } from "@/types/navigation"
-import { BlurView } from "expo-blur"
 import { LinearGradient } from "expo-linear-gradient"
 import * as Location from "expo-location"
 import {
+    AlertCircle,
     ArrowLeft,
     ArrowRight,
     ArrowUp,
@@ -190,14 +190,18 @@ export function NavigationModal({
   const [isNavigating, setIsNavigating] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   const mapRef = useRef<MapView>(null)
   const pulseAnim = useRef(new Animated.Value(1)).current
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current
 
+  console.log('🗺️ NavigationModal - visible:', visible, 'destination:', destination?.name || null)
+
   // Animación de entrada
   useEffect(() => {
-    if (visible) {
+    if (visible && destination) {
+      console.log('🚀 NavigationModal abierto con destino:', destination)
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -207,7 +211,7 @@ export function NavigationModal({
     } else {
       slideAnim.setValue(SCREEN_HEIGHT)
     }
-  }, [visible])
+  }, [visible, destination])
 
   // Animación de pulso para el marcador del usuario
   useEffect(() => {
@@ -231,39 +235,53 @@ export function NavigationModal({
 
   // Obtener ubicación del usuario
   useEffect(() => {
-    if (!visible || !destination) return
+    if (!visible || !destination) {
+      return
+    }
+
+    console.log('📍 Iniciando obtención de ubicación para destino:', destination.name)
 
     const getLocation = async () => {
       setLoading(true)
+      setError(null)
+      
       try {
         const { status } = await Location.requestForegroundPermissionsAsync()
+        console.log('📍 Permiso de ubicación:', status)
+        
         if (status !== "granted") {
-          console.log("Permiso de ubicación denegado")
+          console.log("❌ Permiso de ubicación denegado")
+          setError("Necesitamos acceso a tu ubicación para navegar")
           setLoading(false)
           return
         }
 
+        console.log('📍 Obteniendo ubicación actual...')
         const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
+          accuracy: Location.Accuracy.Balanced,
         })
 
         const userLoc = {
           lat: location.coords.latitude,
           lng: location.coords.longitude,
         }
+        console.log('✅ Ubicación obtenida:', userLoc)
         setUserLocation(userLoc)
 
         // Generar ruta
+        console.log('🛣️ Generando ruta hacia:', destination)
         const route = generateNavigationSteps(
           userLoc.lat,
           userLoc.lng,
           destination.lat,
           destination.lng
         )
+        console.log('✅ Ruta generada:', route)
         setRouteInfo(route)
         setCurrentStepIndex(0)
-      } catch (error) {
-        console.error("Error obteniendo ubicación:", error)
+      } catch (err) {
+        console.error("❌ Error obteniendo ubicación:", err)
+        setError("Error al obtener tu ubicación. Intenta nuevamente.")
       }
       setLoading(false)
     }
@@ -402,7 +420,7 @@ export function NavigationModal({
 
         {/* Header con controles */}
         <View style={styles.header}>
-          <BlurView intensity={80} tint="dark" style={styles.headerBlur}>
+          <View style={styles.headerBlur}>
             <View style={styles.headerContent}>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <X size={24} color="#fff" />
@@ -426,12 +444,12 @@ export function NavigationModal({
                 )}
               </TouchableOpacity>
             </View>
-          </BlurView>
+          </View>
         </View>
 
         {/* Panel de navegación estilo Android Auto */}
         <View style={styles.navigationPanel}>
-          <BlurView intensity={90} tint="dark" style={styles.navigationBlur}>
+          <View style={styles.navigationBlur}>
             {loading ? (
               <View style={styles.loadingContainer}>
                 <Animated.View 
@@ -448,6 +466,18 @@ export function NavigationModal({
                   ]}
                 />
                 <Text style={styles.loadingText}>Calculando ruta...</Text>
+              </View>
+            ) : error ? (
+              // Vista de error
+              <View style={styles.errorContainer}>
+                <AlertCircle size={48} color="#ef4444" />
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity
+                  style={[styles.retryButton, { backgroundColor: transportColor }]}
+                  onPress={onClose}
+                >
+                  <Text style={styles.retryButtonText}>Cerrar</Text>
+                </TouchableOpacity>
               </View>
             ) : !isNavigating ? (
               // Vista previa de ruta
@@ -565,7 +595,7 @@ export function NavigationModal({
                 </View>
               </View>
             )}
-          </BlurView>
+          </View>
         </View>
 
         {/* Botón flotante recentrar */}
@@ -683,6 +713,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "ios" ? 50 : StatusBar.currentHeight ? StatusBar.currentHeight + 10 : 40,
     paddingBottom: SPACING.md,
     paddingHorizontal: SPACING.md,
+    backgroundColor: "rgba(0,0,0,0.7)",
   },
   headerContent: {
     flexDirection: "row",
@@ -732,6 +763,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: BORDER_RADIUS.xl,
     overflow: "hidden",
     paddingBottom: Platform.OS === "ios" ? 34 : SPACING.lg,
+    backgroundColor: "rgba(20,20,30,0.95)",
   },
   loadingContainer: {
     alignItems: "center",
@@ -747,6 +779,29 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: FONT_SIZES.md,
     color: "rgba(255,255,255,0.7)",
+  },
+  errorContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: SPACING.xxl,
+    paddingHorizontal: SPACING.lg,
+  },
+  errorText: {
+    fontSize: FONT_SIZES.md,
+    color: "rgba(255,255,255,0.8)",
+    textAlign: "center",
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  retryButton: {
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  retryButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: "600",
+    color: "#fff",
   },
   previewContainer: {
     padding: SPACING.lg,

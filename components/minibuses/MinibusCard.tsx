@@ -33,13 +33,20 @@ export function MinibusCard({ minibus, selected, onSelect }: MinibusCardProps) {
   }))
 
   const handleNavigate = () => {
+    console.log('🚌 MinibusCard - handleNavigate llamado')
+    console.log('📍 Paradas disponibles:', minibusStops.length)
     setShowStopSelection(true)
   }
 
   const handleSelectStop = (destination: NavigationDestination) => {
+    console.log('✅ MinibusCard - handleSelectStop llamado con:', destination)
     setSelectedDestination(destination)
     setShowStopSelection(false)
-    setShowNavigation(true)
+    // Esperar a que el modal se cierre completamente antes de abrir el siguiente
+    setTimeout(() => {
+      console.log('🗺️ MinibusCard - Abriendo NavigationModal con destino:', destination)
+      setShowNavigation(true)
+    }, 350)
   }
 
   return (
@@ -113,7 +120,10 @@ export function MinibusCard({ minibus, selected, onSelect }: MinibusCardProps) {
             {/* Botón de navegación */}
             <TouchableOpacity
               style={styles.navigateButton}
-              onPress={handleNavigate}
+              onPress={(e) => {
+                e.stopPropagation()
+                handleNavigate()
+              }}
               activeOpacity={0.8}
             >
               <Navigation2 size={14} color="#06b6d4" />
