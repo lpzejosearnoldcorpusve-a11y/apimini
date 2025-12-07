@@ -17,6 +17,7 @@ import MapViewBase, {
   Circle,
   Marker,
   Polyline,
+  PROVIDER_DEFAULT,
   Region,
   UrlTile
 } from 'react-native-maps';
@@ -216,6 +217,8 @@ export function MapViewComponent({
       {/* Mapa */}
       <MapViewBase
         ref={mapRef}
+        provider={PROVIDER_DEFAULT}
+        mapType={Platform.OS === 'android' ? 'none' : 'standard'}
         style={[styles.map, (!isMapReady || mapError) && styles.hiddenMap]}
         initialRegion={region}
         onRegionChangeComplete={setRegion}
@@ -224,50 +227,18 @@ export function MapViewComponent({
           setIsMapReady(true);
           setMapError(false);
         }}
-        showsUserLocation={!!trackUserLocation}
+        showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={true}
         showsScale={true}
         showsPointsOfInterest={false}
-        customMapStyle={[
-          {
-            elementType: "geometry",
-            stylers: [{ color: "#f5f5f5" }]
-          },
-          {
-            elementType: "labels.icon",
-            stylers: [{ visibility: "off" }]
-          },
-          {
-            elementType: "labels.text.fill",
-            stylers: [{ color: "#616161" }]
-          },
-          {
-            elementType: "labels.text.stroke",
-            stylers: [{ color: "#f5f5f5" }]
-          },
-          {
-            featureType: "water",
-            elementType: "geometry",
-            stylers: [{ color: "#c9c9c9" }]
-          },
-          {
-            featureType: "road",
-            elementType: "geometry",
-            stylers: [{ color: "#ffffff" }]
-          },
-          {
-            featureType: "road",
-            elementType: "geometry.stroke",
-            stylers: [{ color: "#d6d6d6" }]
-          },
-        ]}
       >
-        {/* Tiles de OpenStreetMap para iOS */}
-        {Platform.OS === 'ios' && (
+        {/* Tiles de CartoCDN - Solo para Android (iOS usa Apple Maps nativo) */}
+        {Platform.OS === 'android' && (
           <UrlTile
-            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            urlTemplate="https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png"
             maximumZ={19}
+            minimumZ={1}
             flipY={false}
             tileSize={256}
             zIndex={-1}

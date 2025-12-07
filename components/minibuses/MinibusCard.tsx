@@ -1,9 +1,13 @@
 "use client"
 
+import { NavigationModal } from "@/components/navigation/NavigationModal"
+import { StopSelectionModal } from "@/components/navigation/StopSelectionModal"
+import { COLORS } from "@/constants/theme"
+import type { NavigationDestination } from "@/types/navigation"
 import type { Minibus } from "@/types/transport"
 import { LinearGradient } from "expo-linear-gradient"
-import { ChevronRight, Clock, MapPin, Route } from "lucide-react-native"
-import React from "react"
+import { ChevronRight, Clock, MapPin, Navigation2, Route } from "lucide-react-native"
+import React, { useState } from "react"
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native"
 
 interface MinibusCardProps {
@@ -13,7 +17,33 @@ interface MinibusCardProps {
 }
 
 export function MinibusCard({ minibus, selected, onSelect }: MinibusCardProps) {
+  const [showStopSelection, setShowStopSelection] = useState(false)
+  const [showNavigation, setShowNavigation] = useState(false)
+  const [selectedDestination, setSelectedDestination] = useState<NavigationDestination | null>(null)
+
+  // Generar nombres de paradas basados en la posición
+  const minibusStops = minibus.ruta.map((coord, index) => ({
+    index,
+    coordenada: coord,
+    name: index === 0 
+      ? `Inicio - ${minibus.rutaNombre}` 
+      : index === minibus.ruta.length - 1 
+        ? `Final - ${minibus.rutaNombre}`
+        : `Parada ${index + 1}`,
+  }))
+
+  const handleNavigate = () => {
+    setShowStopSelection(true)
+  }
+
+  const handleSelectStop = (destination: NavigationDestination) => {
+    setSelectedDestination(destination)
+    setShowStopSelection(false)
+    setShowNavigation(true)
+  }
+
   return (
+    <>
     <TouchableOpacity 
       onPress={onSelect}
       activeOpacity={0.7}
@@ -79,6 +109,16 @@ export function MinibusCard({ minibus, selected, onSelect }: MinibusCardProps) {
                 </Text>
               </View>
             </View>
+
+            {/* Botón de navegación */}
+            <TouchableOpacity
+              style={styles.navigateButton}
+              onPress={handleNavigate}
+              activeOpacity={0.8}
+            >
+              <Navigation2 size={14} color="#06b6d4" />
+              <Text style={styles.navigateButtonText}>¿Cómo llegar?</Text>
+            </TouchableOpacity>
           </View>
           
           <ChevronRight 
@@ -153,6 +193,26 @@ export function MinibusCard({ minibus, selected, onSelect }: MinibusCardProps) {
         </View>
       )}
     </TouchableOpacity>
+
+    {/* Modal de selección de parada */}
+    <StopSelectionModal
+      visible={showStopSelection}
+      onClose={() => setShowStopSelection(false)}
+      onSelectStop={handleSelectStop}
+      minibusStops={minibusStops}
+      minibusName={`${minibus.linea} - ${minibus.sindicato}`}
+      type="minibus"
+    />
+
+    {/* Modal de navegación */}
+    <NavigationModal
+      visible={showNavigation}
+      destination={selectedDestination}
+      onClose={() => setShowNavigation(false)}
+      transportColor={COLORS.primary}
+      transportName={minibus.rutaNombre}
+    />
+    </>
   )
 }
 
@@ -253,5 +313,21 @@ const styles = StyleSheet.create({
   },
   normalDetailText: {
     color: "#9ca3af",
+  },
+  navigateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 10,
+    alignSelf: "flex-start",
+  },
+  navigateButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#06b6d4",
   },
 })

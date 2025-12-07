@@ -1,9 +1,12 @@
 "use client"
 
+import { NavigationModal } from "@/components/navigation/NavigationModal"
+import { StopSelectionModal } from "@/components/navigation/StopSelectionModal"
+import type { NavigationDestination } from "@/types/navigation"
 import type { Teleferico } from "@/types/transport"
 import { LinearGradient } from "expo-linear-gradient"
-import { Cable, ChevronRight, Clock, MapPin } from "lucide-react-native"
-import React from "react"
+import { Cable, ChevronRight, Clock, MapPin, Navigation2 } from "lucide-react-native"
+import React, { useState } from "react"
 import { LayoutAnimation, Platform, StyleSheet, Text, TouchableOpacity, UIManager, View } from "react-native"
 
 // Habilitar animaciones para Android
@@ -18,6 +21,10 @@ interface TelefericoCardProps {
 }
 
 export function TelefericoCard({ teleferico, selected, onSelect }: TelefericoCardProps) {
+  const [showStopSelection, setShowStopSelection] = useState(false)
+  const [showNavigation, setShowNavigation] = useState(false)
+  const [selectedDestination, setSelectedDestination] = useState<NavigationDestination | null>(null)
+
   const estacionesOrdenadas = teleferico.estaciones.sort((a, b) => a.orden - b.orden)
   const primeraEstacion = estacionesOrdenadas[0]?.nombre || "N/A"
   const ultimaEstacion = estacionesOrdenadas[estacionesOrdenadas.length - 1]?.nombre || "N/A"
@@ -25,6 +32,16 @@ export function TelefericoCard({ teleferico, selected, onSelect }: TelefericoCar
   const handlePress = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     onSelect()
+  }
+
+  const handleNavigate = () => {
+    setShowStopSelection(true)
+  }
+
+  const handleSelectStop = (destination: NavigationDestination) => {
+    setSelectedDestination(destination)
+    setShowStopSelection(false)
+    setShowNavigation(true)
   }
 
   const Container: React.ElementType = selected ? LinearGradient : View;
@@ -36,6 +53,7 @@ export function TelefericoCard({ teleferico, selected, onSelect }: TelefericoCar
   };
 
   return (
+    <>
     <TouchableOpacity 
       onPress={handlePress}
       activeOpacity={0.7}
@@ -109,10 +127,41 @@ export function TelefericoCard({ teleferico, selected, onSelect }: TelefericoCar
                 <Text style={styles.stationName}>{ultimaEstacion}</Text>
               </View>
             </View>
+
+            {/* Botón de navegación */}
+            <TouchableOpacity
+              style={[styles.navigateButton, { borderColor: "rgba(255,255,255,0.3)" }]}
+              onPress={handleNavigate}
+              activeOpacity={0.8}
+            >
+              <Navigation2 size={16} color="#fff" />
+              <Text style={styles.navigateButtonText}>¿Cómo llegar?</Text>
+            </TouchableOpacity>
           </View>
         )}
       </Container>
     </TouchableOpacity>
+
+    {/* Modal de selección de estación */}
+    <StopSelectionModal
+      visible={showStopSelection}
+      onClose={() => setShowStopSelection(false)}
+      onSelectStop={handleSelectStop}
+      estaciones={teleferico.estaciones}
+      telefericoName={teleferico.nombre}
+      telefericoColor={teleferico.color}
+      type="teleferico"
+    />
+
+    {/* Modal de navegación */}
+    <NavigationModal
+      visible={showNavigation}
+      destination={selectedDestination}
+      onClose={() => setShowNavigation(false)}
+      transportColor={teleferico.color}
+      transportName={teleferico.nombre}
+    />
+    </>
   )
 }
 
@@ -245,5 +294,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#ffffff",
     fontWeight: "500",
+  },
+  navigateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  navigateButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#ffffff",
   },
 })
