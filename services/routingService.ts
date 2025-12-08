@@ -1,6 +1,7 @@
 // Servicio de rutas y busqueda con OpenStreetMap Nominatim
 import type { Coordenada, RouteOption, RoutePlanRequest, SearchResult } from "@/types/routing"
 import type { Estacion, Minibus, Teleferico } from "@/types/transport"
+import { combinedRoutingService } from "./combinedRoutingService"
 
 const NOMINATIM_API = "https://nominatim.openstreetmap.org"
 
@@ -392,4 +393,25 @@ export const routingService = {
     // Ordenar por duracion
     return options.sort((a, b) => a.totalDuration - b.totalDuration).slice(0, 5)
   },
+
+  // Planificar rutas combinadas (minibus + teleferico)
+  planCombinedRoutes(request: RoutePlanRequest, minibuses: Minibus[], telefericos: Teleferico[]): RouteOption[] {
+    return combinedRoutingService.generateCombinedOptions(
+      request.origin,
+      request.destination,
+      minibuses,
+      telefericos
+    )
+  },
+
+  // Obtener todas las opciones de rutas (directas + combinadas)
+  planAllRoutes(request: RoutePlanRequest, minibuses: Minibus[], telefericos: Teleferico[]): RouteOption[] {
+    const directRoutes = this.planRoute(request, minibuses, telefericos)
+    const combinedRoutes = this.planCombinedRoutes(request, minibuses, telefericos)
+
+    // Combinar opciones y ordenar por duración
+    const allOptions = [...directRoutes, ...combinedRoutes]
+    return allOptions.sort((a, b) => a.totalDuration - b.totalDuration).slice(0, 8)
+  },
 }
+
