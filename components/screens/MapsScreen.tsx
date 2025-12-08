@@ -462,10 +462,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 })
-
-// Need to add Platform import
-
-// Component for LoadingMap (if needed)
 export function LoadingMap() {
   return (
     <View style={loadingStyles.container}>

@@ -26,6 +26,8 @@ export function NavigationMode({ route, onExit }: NavigationModeProps) {
     estimatedArrival: null,
     remainingDuration: route.totalDuration,
     remainingDistance: route.totalDistance,
+    upcomingAlerts: [], // Add default value for upcomingAlerts
+    travelStats: { distanceTraveled: 0, timeElapsed: 0, costIncurred: 0, segmentsCompleted: 0 }, // Add default value for travelStats
   })
   
   const [isMinimized, setIsMinimized] = useState(false)
