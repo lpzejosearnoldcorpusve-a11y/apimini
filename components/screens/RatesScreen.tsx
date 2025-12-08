@@ -1,14 +1,16 @@
 "use client"
 
 import { NFCScannerModal } from "@/components/tarjetas/NFCScannerModal"
+import { TarjetasVinculadasSection } from "@/components/tarjetas/TarjetasVinculadasSection"
 import { VincularTarjetaModal } from "@/components/tarjetas/VincularTarjetaModal"
 import { BORDER_RADIUS, COLORS, FONT_SIZES, SHADOWS, SPACING } from "@/constants/theme"
 import { useAuth } from "@/context/AuthContext"
+import { useMisTarjetas } from "@/hooks/useMisTarjetas"
 import { useNFC } from "@/hooks/useNFC"
 import { Ionicons } from "@expo/vector-icons"
 import { LinearGradient } from "expo-linear-gradient"
 import { useState } from "react"
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native"
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 
 const RATES = [
@@ -22,11 +24,20 @@ export function RatesScreen() {
   const { user } = useAuth()
   const [showVincularModal, setShowVincularModal] = useState(false)
   const [showNFCModal, setShowNFCModal] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const { isSupported, isScanning, lastScannedCard, error: nfcError, startScan, clearLastCard } = useNFC()
+  const { tarjetas, loading, error, refetch } = useMisTarjetas()
 
   const handleVincularSuccess = () => {
-    // Aqui podrias refrescar las tarjetas del usuario
+    // Refrescar las tarjetas vinculadas después de vincular una nueva
+    refetch()
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await refetch()
+    setRefreshing(false)
   }
 
   return (
@@ -43,8 +54,25 @@ export function RatesScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={COLORS.primary}
+            title="Actualizando tarjetas..."
+            titleColor={COLORS.textSecondary}
+          />
+        }
       >
-        {/* Seccion de Tarjetas */}
+        {/* Seccion de Tarjetas Vinculadas */}
+        <TarjetasVinculadasSection
+          tarjetas={tarjetas}
+          loading={loading}
+          error={error}
+          onRefresh={refetch}
+        />
+
+        {/* Seccion de Acciones */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionIcon}>

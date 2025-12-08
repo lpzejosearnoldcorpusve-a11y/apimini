@@ -1,12 +1,12 @@
 // Tipos para tarjetas RFID
 export interface Tarjeta {
   id: string
+  uid: string
   nombre: string
   celular: string
   montoBs: number
   estado: "activa" | "inactiva"
   usuarioAppId: string | null
-  rfidCode: string
   createdAt: string
   updatedAt: string
 }

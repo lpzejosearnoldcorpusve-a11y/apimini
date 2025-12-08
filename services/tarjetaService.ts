@@ -67,12 +67,11 @@ export const tarjetaService = {
   // Obtener tarjetas vinculadas del usuario
   async getMisTarjetas(usuarioAppId: string): Promise<{ success: boolean; data?: Tarjeta[]; error?: string }> {
     try {
-      const response = await fetch(`${API_BASE}/tarjetas`)
+      const response = await fetch(`${API_BASE}/usuarios-app/${usuarioAppId}`)
       const data = await response.json()
 
-      if (data.success) {
-        const misTarjetas = (data.data || []).filter((t: Tarjeta) => t.usuarioAppId === usuarioAppId)
-        return { success: true, data: misTarjetas }
+      if (data.success && data.data?.tarjetas) {
+        return { success: true, data: data.data.tarjetas }
       }
 
       return { success: false, error: data.message || "Error al obtener tarjetas" }
@@ -89,7 +88,7 @@ export const tarjetaService = {
       const data = await response.json()
 
       if (data.success) {
-        const tarjeta = (data.data || []).find((t: Tarjeta) => t.rfidCode === rfidCode)
+        const tarjeta = (data.data || []).find((t: Tarjeta) => t.uid === rfidCode)
         if (tarjeta) {
           return { success: true, data: tarjeta }
         }
