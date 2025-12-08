@@ -8,14 +8,11 @@
     "scheme": "miniapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    
-    
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.axeluria79.miniapp",
@@ -38,13 +35,21 @@
         "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceder a tu ubicación para proporcionar direcciones y servicios de búsqueda",
         "NSLocationAlwaysUsageDescription": "Esta aplicación necesita acceder a tu ubicación para funcionar correctamente",
         "NFCReaderUsageDescription": "Esta aplicación necesita acceso a NFC para leer tarjetas de transporte",
-        "UIBackgroundModes": ["location"]
+        "UIBackgroundModes": [
+          "location",
+          "location"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": ["TAG", "NDEF"]
+        "com.apple.developer.nfc.readersession.formats": [
+          "TAG",
+          "NDEF",
+          "TAG",
+          "NDEF"
+        ]
       }
     },
-    
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -59,7 +64,10 @@
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.NFC"
+        "android.permission.NFC",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ],
       "config": {
         "googleMaps": {
@@ -67,13 +75,11 @@
         }
       }
     },
-    
     "web": {
       "output": "static",
       "favicon": "./assets/images/android-icon-foreground.png",
       "bundler": "metro"
     },
-    
     "plugins": [
       "expo-router",
       [
@@ -104,23 +110,24 @@
           "android": {
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "minSdkVersion": 26,  
+            "minSdkVersion": 26,
             "buildToolsVersion": "35.0.0",
             "enableProguardInReleaseBuilds": false,
-            "extraMavenRepos": ["https://jitpack.io"]
+            "extraMavenRepos": [
+              "https://jitpack.io"
+            ],
+            "enableMinifyInReleaseBuilds": false
           }
         }
       ],
       "expo-web-browser",
       "react-native-nfc-manager"
     ],
-    
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true,
       "tsconfigPaths": true
     },
-    
     "extra": {
       "router": {
         "origin": false
@@ -129,13 +136,11 @@
         "projectId": "b9904e8e-6db7-4e4d-83a3-23eb266b4c95"
       }
     },
-    
     "owner": "axeluria79",
     "updates": {
       "url": "https://u.expo.dev/b9904e8e-6db7-4e4d-83a3-23eb266b4c95",
       "fallbackToCacheTimeout": 3000
     },
-    
     "runtimeVersion": {
       "policy": "appVersion"
     }
